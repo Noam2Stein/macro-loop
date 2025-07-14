@@ -1,0 +1,2 @@
+[workspace]
+members = [ "examples/vector_swizzle","macro_loop"]

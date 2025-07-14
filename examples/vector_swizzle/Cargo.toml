@@ -1,0 +1,8 @@
+[package]
+edition = "2024"
+name    = "vector_swizzle"
+version = "0.1.0"
+
+[dependencies]
+macro_loop = { path = "../../macro_loop" }
+paste      = "1.0.15"
