@@ -5,7 +5,7 @@ use derive_syn_parse::Parse;
 use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
 use syn::{
-    Error, Ident, Lit, Token,
+    Error, Ident, LitBool, LitByte, LitByteStr, LitCStr, LitChar, LitFloat, LitInt, LitStr, Token,
     parse::{Parse, Parser},
     parse2,
     punctuated::Punctuated,
@@ -16,14 +16,20 @@ use super::{ops::*, value::*};
 
 #[derive(Clone, ToTokens)]
 pub enum Expr {
-    Lit(Lit),
+    Bool(LitBool),
+    Int(LitInt),
+    Float(LitFloat),
+    Str(LitStr),
+    Char(LitChar),
+    CStr(LitCStr),
+    ByteStr(LitByteStr),
     Ident(Ident),
+
     List(ExprList),
-
-    Name(ExprName),
-
     Bin(ExprBin),
     Un(ExprUn),
+
+    Name(ExprName),
 }
 
 #[derive(Clone)]
@@ -144,12 +150,33 @@ impl Expr {
             return Ok(Self::Un(ExprUn { op, base }));
         };
 
-        if let Some(lit) = input.parse::<Option<Lit>>()? {
-            return Ok(Self::Lit(lit));
+        if let Some(lit) = input.parse::<Option<LitBool>>()? {
+            return Ok(Self::Bool(lit));
         };
-
+        if let Some(lit) = input.parse::<Option<LitInt>>()? {
+            return Ok(Self::Int(lit));
+        };
+        if let Some(lit) = input.parse::<Option<LitFloat>>()? {
+            return Ok(Self::Float(lit));
+        };
+        if let Some(lit) = input.parse::<Option<LitStr>>()? {
+            return Ok(Self::Str(lit));
+        };
+        if let Some(lit) = input.parse::<Option<LitChar>>()? {
+            return Ok(Self::Char(lit));
+        };
+        if let Some(lit) = input.parse::<Option<LitCStr>>()? {
+            return Ok(Self::CStr(lit));
+        };
+        if let Some(lit) = input.parse::<Option<LitByteStr>>()? {
+            return Ok(Self::ByteStr(lit));
+        };
         if let Some(ident) = input.parse::<Option<Ident>>()? {
             return Ok(Self::Ident(ident));
+        };
+
+        if let Some(lit) = input.parse::<Option<LitByte>>()? {
+            return Ok(Self::Int(LitInt::new(&lit.value().to_string(), lit.span())));
         };
 
         if let Some(group) = input.parse::<Option<Group>>()? {

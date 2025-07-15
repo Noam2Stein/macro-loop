@@ -4,7 +4,7 @@ use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
 use quote::TokenStreamExt;
 use syn::{
-    Error, Lit, Token,
+    Error, Token,
     parse::{ParseStream, Parser},
     token::Brace,
 };
@@ -30,7 +30,7 @@ impl ApplyFragment for FragmentIf {
         let condition = Value::from_expr(self.condition.clone(), names.clone())?;
 
         let condition = match condition {
-            Value::Lit(Lit::Bool(condition)) => condition.value,
+            Value::Bool(condition) => condition.value,
             _ => return Err(Error::new_spanned(self.condition, "expected a bool")),
         };
 

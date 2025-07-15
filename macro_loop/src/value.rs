@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use proc_macro2::{Group, Literal, Span, TokenStream, TokenTree};
+use proc_macro2::{Group, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
 use syn::{
-    Error, Ident, Lit, LitBool, LitStr, Token,
+    Error, Ident, LitBool, LitByteStr, LitCStr, LitChar, LitFloat, LitInt, LitStr, Token,
     parse::{ParseStream, Parser},
     parse2,
     punctuated::Punctuated,
@@ -16,8 +16,15 @@ use super::{expr::*, ops::*, to_tokens_spanned::*};
 
 #[derive(Clone)]
 pub enum Value {
-    Lit(Lit),
+    Bool(LitBool),
+    Int(LitInt),
+    Float(LitFloat),
+    Str(LitStr),
+    Char(LitChar),
+    CStr(LitCStr),
+    ByteStr(LitByteStr),
     Ident(Ident),
+
     List(ValueList),
 }
 
@@ -29,22 +36,25 @@ pub struct ValueList {
 
 impl ToTokensSpanned for Value {
     fn to_tokens_spanned(&self, span: Span, tokens: &mut TokenStream) {
+        macro_rules! set_span {
+            ($self_:ident) => {{
+                let mut self_ = $self_.clone();
+                self_.set_span(span);
+                self_.to_tokens(tokens);
+            }};
+        }
+
         match self {
             Self::List(list) => list.to_tokens_spanned(span, tokens),
 
-            Self::Ident(ident) => {
-                let mut ident = ident.clone();
-                ident.set_span(span);
-
-                ident.to_tokens(tokens);
-            }
-
-            Self::Lit(lit) => {
-                let mut lit = lit.clone();
-                lit.set_span(span);
-
-                lit.to_tokens(tokens);
-            }
+            Self::Bool(self_) => set_span!(self_),
+            Self::Int(self_) => set_span!(self_),
+            Self::Float(self_) => set_span!(self_),
+            Self::Str(self_) => set_span!(self_),
+            Self::Char(self_) => set_span!(self_),
+            Self::CStr(self_) => set_span!(self_),
+            Self::ByteStr(self_) => set_span!(self_),
+            Self::Ident(self_) => set_span!(self_),
         }
     }
 }
@@ -68,9 +78,15 @@ impl ToTokensSpanned for ValueList {
 impl ToTokens for Value {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         match self {
-            Self::Lit(lit) => lit.to_tokens(tokens),
-            Self::Ident(ident) => ident.to_tokens(tokens),
-            Self::List(list) => list.to_tokens(tokens),
+            Self::Bool(self_) => self_.to_tokens(tokens),
+            Self::Int(self_) => self_.to_tokens(tokens),
+            Self::Float(self_) => self_.to_tokens(tokens),
+            Self::Str(self_) => self_.to_tokens(tokens),
+            Self::Char(self_) => self_.to_tokens(tokens),
+            Self::CStr(self_) => self_.to_tokens(tokens),
+            Self::ByteStr(self_) => self_.to_tokens(tokens),
+            Self::Ident(self_) => self_.to_tokens(tokens),
+            Self::List(self_) => self_.to_tokens(tokens),
         }
     }
 }
@@ -92,8 +108,14 @@ impl Value {
         let expr = parse2::<Expr>(map_fn.parse2(expr.to_token_stream())?)?;
 
         Ok(match expr {
-            Expr::Lit(lit) => Self::Lit(lit),
-            Expr::Ident(ident) => Self::Ident(ident),
+            Expr::Bool(self_) => Self::Bool(self_),
+            Expr::Int(self_) => Self::Int(self_),
+            Expr::Float(self_) => Self::Float(self_),
+            Expr::Str(self_) => Self::Str(self_),
+            Expr::Char(self_) => Self::Char(self_),
+            Expr::CStr(self_) => Self::CStr(self_),
+            Expr::ByteStr(self_) => Self::ByteStr(self_),
+            Expr::Ident(self_) => Self::Ident(self_),
 
             Expr::List(list) => Self::List(ValueList {
                 span: list.span,
@@ -111,36 +133,29 @@ impl Value {
                 let rhs = Value::from_expr(*rhs, names.clone())?;
 
                 match (lhs, rhs) {
-                    (Self::Lit(Lit::Int(lhs)), Self::Lit(Lit::Int(rhs))) => Self::int_bin_op(
+                    (Self::Bool(lhs), Self::Bool(rhs)) => {
+                        Self::bool_bin_op(lhs.value, op, rhs.value)?
+                    }
+
+                    (Self::Int(lhs), Self::Int(rhs)) => Self::int_bin_op(
                         lhs.base10_parse::<u128>()?,
                         op,
                         rhs.base10_parse::<u128>()?,
                     )?,
 
-                    (Self::Lit(Lit::Float(lhs)), Self::Lit(Lit::Float(rhs))) => Self::float_bin_op(
+                    (Self::Float(lhs), Self::Float(rhs)) => Self::float_bin_op(
                         lhs.base10_parse::<f64>()?,
                         op,
                         rhs.base10_parse::<f64>()?,
                     )?,
 
-                    (Self::Lit(Lit::Bool(lhs)), Self::Lit(Lit::Bool(rhs))) => {
-                        Value::Lit(Lit::Bool(LitBool::new(
-                            Self::bool_bin_op(lhs.value, op, rhs.value)?,
-                            op.span(),
-                        )))
+                    (Self::Str(lhs), Self::Str(rhs)) => {
+                        Self::str_bin_op(&lhs.value(), op, &rhs.value())?
                     }
 
-                    (Self::Lit(Lit::Str(lhs)), Self::Lit(Lit::Str(rhs))) => {
-                        Value::Lit(Lit::Str(LitStr::new(
-                            &Self::str_bin_op(&lhs.value(), op, &rhs.value())?,
-                            op.span(),
-                        )))
+                    (Self::Ident(lhs), Self::Ident(rhs)) => {
+                        Self::ident_bin_op(&lhs.to_string(), op, &rhs.to_string())?
                     }
-
-                    (Self::Ident(lhs), Self::Ident(rhs)) => Value::Ident(Ident::new(
-                        &Self::str_bin_op(&lhs.to_string(), op, &rhs.to_string())?,
-                        op.span(),
-                    )),
 
                     _ => return Err(Error::new_spanned(op, "invalid operation")),
                 }
@@ -158,24 +173,31 @@ impl Value {
 
     fn int_bin_op(lhs: u128, op: BinOp, rhs: u128) -> syn::Result<Self> {
         Ok(match op {
-            BinOp::Add(_) => int(lhs + rhs),
-            BinOp::Sub(_) => int(lhs - rhs),
-            BinOp::Mul(_) => int(lhs * rhs),
-            BinOp::Div(_) => int(lhs / rhs),
-            BinOp::Rem(_) => int(lhs % rhs),
+            BinOp::Add(_) => int(lhs + rhs, op.span()),
+            BinOp::Sub(_) => int(lhs - rhs, op.span()),
+            BinOp::Mul(_) => int(lhs * rhs, op.span()),
+            BinOp::Div(_) => int(lhs / rhs, op.span()),
+            BinOp::Rem(_) => int(lhs % rhs, op.span()),
 
-            BinOp::BitAnd(_) => int(lhs & rhs),
-            BinOp::BitOr(_) => int(lhs | rhs),
-            BinOp::Shl(_) => int(lhs << rhs),
-            BinOp::Shr(_) => int(lhs >> rhs),
+            BinOp::BitAnd(_) => int(lhs & rhs, op.span()),
+            BinOp::BitOr(_) => int(lhs | rhs, op.span()),
+            BinOp::Shl(_) => int(lhs << rhs, op.span()),
+            BinOp::Shr(_) => int(lhs >> rhs, op.span()),
+
+            BinOp::Eq(_) => bool(lhs == rhs, op.span()),
+            BinOp::Ne(_) => bool(lhs != rhs, op.span()),
+            BinOp::Lt(_) => bool(lhs < rhs, op.span()),
+            BinOp::Gt(_) => bool(lhs > rhs, op.span()),
+            BinOp::Le(_) => bool(lhs <= rhs, op.span()),
+            BinOp::Ge(_) => bool(lhs >= rhs, op.span()),
 
             BinOp::Range(op) => Self::List(ValueList {
                 span: op.span(),
-                items: (lhs..rhs).map(|i| int(i)).collect(),
+                items: (lhs..rhs).map(|i| int(i, op.span())).collect(),
             }),
             BinOp::RangeInclusive(op) => Self::List(ValueList {
                 span: op.span(),
-                items: (lhs..=rhs).map(|i| int(i)).collect(),
+                items: (lhs..=rhs).map(|i| int(i, op.span())).collect(),
             }),
 
             _ => return Err(Error::new_spanned(op, "invalid operation")),
@@ -184,49 +206,87 @@ impl Value {
 
     fn float_bin_op(lhs: f64, op: BinOp, rhs: f64) -> syn::Result<Self> {
         Ok(match op {
-            BinOp::Add(_) => float(lhs + rhs),
-            BinOp::Sub(_) => float(lhs - rhs),
-            BinOp::Mul(_) => float(lhs * rhs),
-            BinOp::Div(_) => float(lhs / rhs),
-            BinOp::Rem(_) => float(lhs % rhs),
+            BinOp::Add(_) => float(lhs + rhs, op.span()),
+            BinOp::Sub(_) => float(lhs - rhs, op.span()),
+            BinOp::Mul(_) => float(lhs * rhs, op.span()),
+            BinOp::Div(_) => float(lhs / rhs, op.span()),
+            BinOp::Rem(_) => float(lhs % rhs, op.span()),
+
+            BinOp::Eq(_) => bool(lhs == rhs, op.span()),
+            BinOp::Ne(_) => bool(lhs != rhs, op.span()),
+            BinOp::Lt(_) => bool(lhs < rhs, op.span()),
+            BinOp::Gt(_) => bool(lhs > rhs, op.span()),
+            BinOp::Le(_) => bool(lhs <= rhs, op.span()),
+            BinOp::Ge(_) => bool(lhs >= rhs, op.span()),
 
             _ => return Err(Error::new_spanned(op, "invalid operation")),
         })
     }
 
-    fn bool_bin_op(lhs: bool, op: BinOp, rhs: bool) -> syn::Result<bool> {
+    fn bool_bin_op(lhs: bool, op: BinOp, rhs: bool) -> syn::Result<Self> {
         Ok(match op {
-            BinOp::BitAnd(_) => lhs & rhs,
-            BinOp::BitOr(_) => lhs | rhs,
-            BinOp::BitXor(_) => lhs ^ rhs,
+            BinOp::BitAnd(_) | BinOp::LogicalAnd(_) => bool(lhs & rhs, op.span()),
+            BinOp::BitOr(_) | BinOp::LogicalOr(_) => bool(lhs | rhs, op.span()),
+            BinOp::BitXor(_) => bool(lhs ^ rhs, op.span()),
+
+            BinOp::Eq(_) => bool(lhs == rhs, op.span()),
+            BinOp::Ne(_) => bool(lhs != rhs, op.span()),
+            BinOp::Lt(_) => bool(lhs < rhs, op.span()),
+            BinOp::Gt(_) => bool(lhs > rhs, op.span()),
+            BinOp::Le(_) => bool(lhs <= rhs, op.span()),
+            BinOp::Ge(_) => bool(lhs >= rhs, op.span()),
 
             _ => return Err(Error::new_spanned(op, "invalid operation")),
         })
     }
 
-    fn str_bin_op(lhs: &str, op: BinOp, rhs: &str) -> syn::Result<String> {
+    fn str_bin_op(lhs: &str, op: BinOp, rhs: &str) -> syn::Result<Self> {
         Ok(match op {
-            BinOp::Add(_) => lhs.to_string() + rhs,
+            BinOp::Add(_) => string(lhs.to_string() + rhs, op.span()),
+
+            BinOp::Eq(_) => bool(lhs == rhs, op.span()),
+            BinOp::Ne(_) => bool(lhs != rhs, op.span()),
+            BinOp::Lt(_) => bool(lhs < rhs, op.span()),
+            BinOp::Gt(_) => bool(lhs > rhs, op.span()),
+            BinOp::Le(_) => bool(lhs <= rhs, op.span()),
+            BinOp::Ge(_) => bool(lhs >= rhs, op.span()),
+
+            _ => return Err(Error::new_spanned(op, "invalid operation")),
+        })
+    }
+
+    fn ident_bin_op(lhs: &str, op: BinOp, rhs: &str) -> syn::Result<Self> {
+        Ok(match op {
+            BinOp::Add(_) => ident(lhs.to_string() + rhs, op.span()),
+
+            BinOp::Eq(_) => bool(lhs == rhs, op.span()),
+            BinOp::Ne(_) => bool(lhs != rhs, op.span()),
+            BinOp::Lt(_) => bool(lhs < rhs, op.span()),
+            BinOp::Gt(_) => bool(lhs > rhs, op.span()),
+            BinOp::Le(_) => bool(lhs <= rhs, op.span()),
+            BinOp::Ge(_) => bool(lhs >= rhs, op.span()),
 
             _ => return Err(Error::new_spanned(op, "invalid operation")),
         })
     }
 }
 
-fn int(value: u128) -> Value {
-    Value::Lit(
-        parse2(TokenStream::from_iter([TokenTree::Literal(
-            Literal::u128_unsuffixed(value),
-        )]))
-        .unwrap(),
-    )
+fn int(value: u128, span: Span) -> Value {
+    Value::Int(LitInt::new(&value.to_string(), span))
 }
 
-fn float(value: f64) -> Value {
-    Value::Lit(
-        parse2(TokenStream::from_iter([TokenTree::Literal(
-            Literal::f64_unsuffixed(value),
-        )]))
-        .unwrap(),
-    )
+fn float(value: f64, span: Span) -> Value {
+    Value::Float(LitFloat::new(&value.to_string(), span))
+}
+
+fn bool(value: bool, span: Span) -> Value {
+    Value::Bool(LitBool { value, span })
+}
+
+fn string(value: impl AsRef<str>, span: Span) -> Value {
+    Value::Str(LitStr::new(value.as_ref(), span))
+}
+
+fn ident(value: impl AsRef<str>, span: Span) -> Value {
+    Value::Ident(Ident::new(value.as_ref(), span))
 }

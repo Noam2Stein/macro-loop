@@ -5,7 +5,7 @@ use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
 use quote::TokenStreamExt;
 use syn::{
-    Error, Ident, Lit, Token,
+    Error, Ident, Token,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Bracket,
@@ -59,17 +59,15 @@ impl FragmentIdentSegment {
                 let value = name.find(names)?;
 
                 match value {
+                    Value::Bool(lit) => lit.value.to_string(),
+                    Value::Int(lit) => lit.base10_parse::<u128>().unwrap().to_string(),
+                    Value::Str(lit) => lit.value(),
+                    Value::Char(lit) => lit.value().to_string(),
+                    Value::CStr(lit) => lit.value().to_str().unwrap().to_string(),
+                    Value::ByteStr(lit) => String::from_utf8(lit.value()).unwrap(),
                     Value::Ident(ident) => ident.to_string(),
 
-                    Value::Lit(Lit::Bool(lit)) => lit.value.to_string(),
-                    Value::Lit(Lit::Byte(lit)) => (lit.value() as char).to_string(),
-                    Value::Lit(Lit::ByteStr(lit)) => String::from_utf8(lit.value()).unwrap(),
-                    Value::Lit(Lit::CStr(lit)) => lit.value().to_str().unwrap().to_string(),
-                    Value::Lit(Lit::Char(lit)) => lit.value().to_string(),
-                    Value::Lit(Lit::Int(lit)) => lit.base10_parse::<u128>().unwrap().to_string(),
-                    Value::Lit(Lit::Str(lit)) => lit.value(),
-
-                    Value::List(_) | Value::Lit(_) => {
+                    _ => {
                         return Err(Error::new_spanned(value, "not an identifier value"));
                     }
                 }
