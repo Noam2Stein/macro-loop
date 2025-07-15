@@ -24,7 +24,7 @@ pub fn map_tokenstream(
         if is_after_marker {
             let control_flow = ControlFlow::parse(input)?;
 
-            output.append_all(control_flow.map_body(values));
+            output.append_all(control_flow.map_body(values)?);
         } else if let TokenTree::Group(group) = &token {
             let stream_fn = |input: ParseStream| map_tokenstream(input, values);
             let stream = stream_fn.parse2(group.stream())?;
