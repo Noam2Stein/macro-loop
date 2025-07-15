@@ -27,11 +27,11 @@ impl ApplyFragment for FragmentIf {
         names: &mut HashMap<String, Value>,
         tokens: &mut TokenStream,
     ) -> syn::Result<()> {
-        let condition = Value::from_expr(self.condition, names.clone())?;
+        let condition = Value::from_expr(self.condition.clone(), names.clone())?;
 
         let condition = match condition {
             Value::Lit(Lit::Bool(condition)) => condition.value,
-            condition => return Err(Error::new_spanned(condition, "expected a bool")),
+            _ => return Err(Error::new_spanned(self.condition, "expected a bool")),
         };
 
         if condition {
