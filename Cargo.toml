@@ -1,2 +1,2 @@
 [workspace]
-members = [ "examples/unique_combo", "examples/vector_swizzle","macro_loop"]
+members = [ "examples/unique_combo", "examples/vector_swizzle","macro_loop", "sandbox"]
