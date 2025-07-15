@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
-use quote::TokenStreamExt;
+use quote::{ToTokens, TokenStreamExt};
 use syn::{
     Error, Ident, Token,
     parse::{ParseStream, Parser},
     punctuated::Punctuated,
-    token::Brace,
+    token::{Brace, Paren},
 };
 
 use crate::{map::map_tokenstream, to_tokens_spanned::ToTokensSpanned};
@@ -23,6 +23,10 @@ pub enum Fragment {
     #[allow(private_interfaces)]
     #[peek(Token![let], name = "let")]
     Let(FragmentLet),
+
+    #[allow(private_interfaces)]
+    #[peek(Paren, name = "an expe")]
+    Expr(FragmentExpr),
 
     #[peek(Ident, name = "a name")]
     Name(Ident),
@@ -60,6 +64,14 @@ struct FragmentLet {
     _semi_token: Token![;],
 }
 
+#[derive(Clone, Parse)]
+struct FragmentExpr {
+    #[paren]
+    _parens: Paren,
+    #[inside(_parens)]
+    expr: Expr,
+}
+
 impl ApplyFragment for Fragment {
     fn apply(
         self,
@@ -69,6 +81,7 @@ impl ApplyFragment for Fragment {
         match self {
             Self::For(self_) => self_.apply(names, tokens),
             Self::Let(self_) => self_.apply(names, tokens),
+            Self::Expr(self_) => self_.apply(names, tokens),
             Self::Name(self_) => self_.apply(names, tokens),
         }
     }
@@ -121,6 +134,20 @@ impl ApplyFragment for FragmentLet {
         let value = Value::from_expr(self.value, names.clone())?;
 
         self.pat.insert_to_names(value, names)?;
+
+        Ok(())
+    }
+}
+
+impl ApplyFragment for FragmentExpr {
+    fn apply(
+        self,
+        names: &mut HashMap<String, Value>,
+        tokens: &mut TokenStream,
+    ) -> syn::Result<()> {
+        let value = Value::from_expr(self.expr, names.clone())?;
+
+        value.to_tokens(tokens);
 
         Ok(())
     }
