@@ -1,3 +1,6 @@
+#![deny(missing_docs)]
+#![doc = include_str!("../../README.md")]
+
 use proc_macro2::TokenStream;
 use syn::parse::{ParseStream, Parser};
 
