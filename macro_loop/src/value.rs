@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use proc_macro2::{Group, Span, TokenStream, TokenTree, extra::DelimSpan};
+use proc_macro2::{Group, Literal, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
 use syn::{
-    Error, Ident, Lit, Token,
+    Error, Ident, Lit, LitBool, LitStr, Token,
     parse::{ParseStream, Parser},
     parse2,
     punctuated::Punctuated,
@@ -23,7 +23,7 @@ pub enum Value {
 
 #[derive(Clone)]
 pub struct ValueList {
-    pub span: DelimSpan,
+    pub span: Span,
     pub items: Vec<Value>,
 }
 
@@ -110,116 +110,123 @@ impl Value {
                 let lhs = Value::from_expr(*lhs, names.clone())?;
                 let rhs = Value::from_expr(*rhs, names.clone())?;
 
-                match op {
-                    BinOp::Add(op) => Self::add(lhs, op, rhs)?,
-                    BinOp::Sub(op) => Self::sub(lhs, op, rhs)?,
-                    BinOp::Mul(op) => Self::mul(lhs, op, rhs)?,
-                    BinOp::Div(op) => Self::div(lhs, op, rhs)?,
-                    BinOp::Rem(op) => Self::rem(lhs, op, rhs)?,
+                match (lhs, rhs) {
+                    (Self::Lit(Lit::Int(lhs)), Self::Lit(Lit::Int(rhs))) => Self::int_bin_op(
+                        lhs.base10_parse::<u128>()?,
+                        op,
+                        rhs.base10_parse::<u128>()?,
+                    )?,
 
-                    BinOp::And(op) => Self::and(lhs, op, rhs)?,
-                    BinOp::Or(op) => Self::or(lhs, op, rhs)?,
-                    BinOp::Xor(op) => Self::xor(lhs, op, rhs)?,
-                    BinOp::Shl(op) => Self::shl(lhs, op, rhs)?,
-                    BinOp::Shr(op) => Self::shr(lhs, op, rhs)?,
+                    (Self::Lit(Lit::Float(lhs)), Self::Lit(Lit::Float(rhs))) => Self::float_bin_op(
+                        lhs.base10_parse::<f64>()?,
+                        op,
+                        rhs.base10_parse::<f64>()?,
+                    )?,
 
-                    BinOp::Range(op) => Self::range(lhs, op, rhs)?,
-                    BinOp::RangeInclusive(op) => Self::range_inclusive(lhs, op, rhs)?,
+                    (Self::Lit(Lit::Bool(lhs)), Self::Lit(Lit::Bool(rhs))) => {
+                        Value::Lit(Lit::Bool(LitBool::new(
+                            Self::bool_bin_op(lhs.value, op, rhs.value)?,
+                            op.span(),
+                        )))
+                    }
+
+                    (Self::Lit(Lit::Str(lhs)), Self::Lit(Lit::Str(rhs))) => {
+                        Value::Lit(Lit::Str(LitStr::new(
+                            &Self::str_bin_op(&lhs.value(), op, &rhs.value())?,
+                            op.span(),
+                        )))
+                    }
+
+                    (Self::Ident(lhs), Self::Ident(rhs)) => Value::Ident(Ident::new(
+                        &Self::str_bin_op(&lhs.to_string(), op, &rhs.to_string())?,
+                        op.span(),
+                    )),
+
+                    _ => return Err(Error::new_spanned(op, "invalid operation")),
                 }
             }
 
             Expr::Un(ExprUn { op, base }) => {
                 let base = Value::from_expr(*base, names)?;
 
-                match op {
-                    UnOp::Neg(op) => Self::neg(op, base)?,
-                    UnOp::Not(op) => Self::not(op, base)?,
+                match base {
+                    _ => return Err(Error::new_spanned(op, "invalid operation")),
                 }
             }
         })
     }
 
-    fn add(lhs: Self, op: Token![+], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid add")),
+    fn int_bin_op(lhs: u128, op: BinOp, rhs: u128) -> syn::Result<Self> {
+        Ok(match op {
+            BinOp::Add(_) => int(lhs + rhs),
+            BinOp::Sub(_) => int(lhs - rhs),
+            BinOp::Mul(_) => int(lhs * rhs),
+            BinOp::Div(_) => int(lhs / rhs),
+            BinOp::Rem(_) => int(lhs % rhs),
+
+            BinOp::And(_) => int(lhs & rhs),
+            BinOp::Or(_) => int(lhs | rhs),
+            BinOp::Shl(_) => int(lhs << rhs),
+            BinOp::Shr(_) => int(lhs >> rhs),
+
+            BinOp::Range(op) => Self::List(ValueList {
+                span: op.span(),
+                items: (lhs..rhs).map(|i| int(i)).collect(),
+            }),
+            BinOp::RangeInclusive(op) => Self::List(ValueList {
+                span: op.span(),
+                items: (lhs..=rhs).map(|i| int(i)).collect(),
+            }),
+
+            _ => return Err(Error::new_spanned(op, "invalid operation")),
         })
     }
 
-    fn sub(lhs: Self, op: Token![-], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid sub")),
+    fn float_bin_op(lhs: f64, op: BinOp, rhs: f64) -> syn::Result<Self> {
+        Ok(match op {
+            BinOp::Add(_) => float(lhs + rhs),
+            BinOp::Sub(_) => float(lhs - rhs),
+            BinOp::Mul(_) => float(lhs * rhs),
+            BinOp::Div(_) => float(lhs / rhs),
+            BinOp::Rem(_) => float(lhs % rhs),
+
+            _ => return Err(Error::new_spanned(op, "invalid operation")),
         })
     }
 
-    fn mul(lhs: Self, op: Token![*], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid mul")),
+    fn bool_bin_op(lhs: bool, op: BinOp, rhs: bool) -> syn::Result<bool> {
+        Ok(match op {
+            BinOp::And(_) => lhs & rhs,
+            BinOp::Or(_) => lhs | rhs,
+            BinOp::Xor(_) => lhs ^ rhs,
+
+            _ => return Err(Error::new_spanned(op, "invalid operation")),
         })
     }
 
-    fn div(lhs: Self, op: Token![/], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid div")),
-        })
-    }
+    fn str_bin_op(lhs: &str, op: BinOp, rhs: &str) -> syn::Result<String> {
+        Ok(match op {
+            BinOp::Add(_) => lhs.to_string() + rhs,
 
-    fn rem(lhs: Self, op: Token![%], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid rem")),
+            _ => return Err(Error::new_spanned(op, "invalid operation")),
         })
     }
+}
 
-    fn and(lhs: Self, op: Token![&], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid and")),
-        })
-    }
+fn int(value: u128) -> Value {
+    Value::Lit(
+        parse2(TokenStream::from_iter([TokenTree::Literal(
+            Literal::u128_unsuffixed(value),
+        )]))
+        .unwrap(),
+    )
+}
 
-    fn or(lhs: Self, op: Token![|], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid or")),
-        })
-    }
-
-    fn xor(lhs: Self, op: Token![^], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid xor")),
-        })
-    }
-
-    fn shl(lhs: Self, op: Token![<<], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid shl")),
-        })
-    }
-
-    fn shr(lhs: Self, op: Token![>>], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid shr")),
-        })
-    }
-
-    fn range(lhs: Self, op: Token![..], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid range")),
-        })
-    }
-
-    fn range_inclusive(lhs: Self, op: Token![..=], rhs: Self) -> syn::Result<Self> {
-        Ok(match (lhs, rhs) {
-            _ => return Err(Error::new_spanned(op, "invalid range")),
-        })
-    }
-
-    fn neg(op: Token![-], base: Self) -> syn::Result<Self> {
-        Ok(match base {
-            _ => return Err(Error::new_spanned(op, "invalid neg")),
-        })
-    }
-
-    fn not(op: Token![!], base: Self) -> syn::Result<Self> {
-        Ok(match base {
-            _ => return Err(Error::new_spanned(op, "invalid not")),
-        })
-    }
+fn float(value: f64) -> Value {
+    Value::Lit(
+        parse2(TokenStream::from_iter([TokenTree::Literal(
+            Literal::f64_unsuffixed(value),
+        )]))
+        .unwrap(),
+    )
 }

@@ -1,5 +1,5 @@
 use derive_quote_to_tokens::ToTokens;
-use proc_macro2::{Delimiter, Group, TokenStream, TokenTree, extra::DelimSpan};
+use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
 use syn::{
     Error, Ident, Lit, Token,
@@ -25,7 +25,7 @@ pub enum Expr {
 
 #[derive(Clone)]
 pub struct ExprList {
-    pub span: DelimSpan,
+    pub span: Span,
     pub items: Vec<Expr>,
 }
 
@@ -155,7 +155,7 @@ impl Expr {
                         Punctuated::<_, Token![,]>::parse_terminated.parse2(group.stream())?;
 
                     Self::List(ExprList {
-                        span: group.delim_span(),
+                        span: group.span(),
                         items: punctuated.into_iter().collect(),
                     })
                 }
