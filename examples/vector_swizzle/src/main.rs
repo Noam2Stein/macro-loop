@@ -27,9 +27,7 @@ impl Vec4 {
         @let components = [x, y, z, w];
 
         @for X in @components, Y in @components, Z in @components, W in @components {
-
-            @let fn_name = @X + @Y + @Z + @W;
-            pub fn @fn_name(self) -> Vec4 {
+            pub fn @[@X @Y @Z @W](self) -> Vec4 {
                 Vec4 { x: self.@X, y: self.@Y, z: self.@Z, w: self.@W }
             }
         }

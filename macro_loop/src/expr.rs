@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use derive_quote_to_tokens::ToTokens;
+use derive_syn_parse::Parse;
 use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
 use syn::{
@@ -9,7 +12,7 @@ use syn::{
     spanned::Spanned,
 };
 
-use super::op::*;
+use super::{op::*, value::*};
 
 #[derive(Clone, ToTokens)]
 pub enum Expr {
@@ -42,7 +45,7 @@ pub struct ExprUn {
     pub base: Box<Expr>,
 }
 
-#[derive(Clone, ToTokens)]
+#[derive(Clone, Parse, ToTokens)]
 pub struct ExprName {
     pub _at_token: Token![@],
     pub name: Ident,
@@ -118,6 +121,18 @@ impl ToTokens for ExprUn {
         let group = Group::new(proc_macro2::Delimiter::Parenthesis, group_stream);
 
         tokens.append(TokenTree::Group(group));
+    }
+}
+
+impl ExprName {
+    pub fn find(&self, names: &HashMap<String, Value>) -> syn::Result<Value> {
+        match names.get(&self.name.to_string()) {
+            Some(value) => Ok(value.clone()),
+            None => Err(Error::new_spanned(
+                &self.name,
+                format!("can't find {}", self.name),
+            )),
+        }
     }
 }
 

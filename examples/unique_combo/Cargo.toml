@@ -1,0 +1,7 @@
+[package]
+edition = "2024"
+name    = "unique_combo"
+version = "0.1.0"
+
+[dependencies]
+macro_loop = { path = "../../macro_loop" }
