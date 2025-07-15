@@ -104,7 +104,7 @@ impl Value {
                     .collect::<syn::Result<_>>()?,
             }),
 
-            Expr::Name(name) => unreachable!(),
+            Expr::Name(_) => unreachable!(),
 
             Expr::Bin(ExprBin { lhs, op, rhs }) => {
                 let lhs = Value::from_expr(*lhs, names.clone())?;
