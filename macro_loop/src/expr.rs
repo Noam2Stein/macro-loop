@@ -12,7 +12,7 @@ use syn::{
     spanned::Spanned,
 };
 
-use super::{op::*, value::*};
+use super::{ops::*, value::*};
 
 #[derive(Clone, ToTokens)]
 pub enum Expr {

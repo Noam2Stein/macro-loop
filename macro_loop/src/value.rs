@@ -12,7 +12,7 @@ use syn::{
 
 use crate::map::map_tokenstream;
 
-use super::{expr::*, op::*, to_tokens_spanned::*};
+use super::{expr::*, ops::*, to_tokens_spanned::*};
 
 #[derive(Clone)]
 pub enum Value {
@@ -164,8 +164,8 @@ impl Value {
             BinOp::Div(_) => int(lhs / rhs),
             BinOp::Rem(_) => int(lhs % rhs),
 
-            BinOp::And(_) => int(lhs & rhs),
-            BinOp::Or(_) => int(lhs | rhs),
+            BinOp::BitAnd(_) => int(lhs & rhs),
+            BinOp::BitOr(_) => int(lhs | rhs),
             BinOp::Shl(_) => int(lhs << rhs),
             BinOp::Shr(_) => int(lhs >> rhs),
 
@@ -196,9 +196,9 @@ impl Value {
 
     fn bool_bin_op(lhs: bool, op: BinOp, rhs: bool) -> syn::Result<bool> {
         Ok(match op {
-            BinOp::And(_) => lhs & rhs,
-            BinOp::Or(_) => lhs | rhs,
-            BinOp::Xor(_) => lhs ^ rhs,
+            BinOp::BitAnd(_) => lhs & rhs,
+            BinOp::BitOr(_) => lhs | rhs,
+            BinOp::BitXor(_) => lhs ^ rhs,
 
             _ => return Err(Error::new_spanned(op, "invalid operation")),
         })

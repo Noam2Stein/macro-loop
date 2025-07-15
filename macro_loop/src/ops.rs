@@ -9,11 +9,20 @@ pub enum BinOp {
     Div(Token![/]),
     Rem(Token![%]),
 
-    And(Token![&]),
-    Or(Token![|]),
-    Xor(Token![^]),
+    BitAnd(Token![&]),
+    BitOr(Token![|]),
+    BitXor(Token![^]),
     Shl(Token![<<]),
     Shr(Token![>>]),
+
+    Eq(Token![==]),
+    Ne(Token![!=]),
+    Lt(Token![<]),
+    Gt(Token![>]),
+    Le(Token![<=]),
+    Ge(Token![>=]),
+    LogicalAnd(Token![&&]),
+    LogicalOr(Token![||]),
 
     Range(Token![..]),
     RangeInclusive(Token![..=]),
@@ -31,10 +40,13 @@ pub enum BinOpLvl {
     ShlShr,
     MulDivRem,
     AddSub,
-    And,
-    Xor,
-    Or,
+    BitAnd,
+    BitXor,
+    BitOr,
     Range,
+    Eq,
+    LogicalAnd,
+    LogicalOr,
 }
 
 impl BinOp {
@@ -54,17 +66,28 @@ impl BinOp {
             }
         }
 
+        option_parse!(&& => LogicalAnd);
+        option_parse!(|| => LogicalOr);
+
+        option_parse!(== => Eq);
+        option_parse!(!= => Ne);
+        option_parse!(<= => Le);
+        option_parse!(>= => Ge);
+
         option_parse!(+ => Add);
         option_parse!(- => Sub);
         option_parse!(* => Mul);
         option_parse!(/ => Div);
         option_parse!(% => Rem);
 
-        option_parse!(& => And);
-        option_parse!(| => Or);
-        option_parse!(^ => Xor);
+        option_parse!(& => BitAnd);
+        option_parse!(| => BitOr);
+        option_parse!(^ => BitXor);
         option_parse!(<< => Shl);
         option_parse!(>> => Shr);
+
+        option_parse!(< => Lt);
+        option_parse!(> => Gt);
 
         None
     }
@@ -73,11 +96,16 @@ impl BinOp {
         match self {
             Self::Mul(_) | Self::Div(_) | Self::Rem(_) => BinOpLvl::MulDivRem,
             Self::Add(_) | Self::Sub(_) => BinOpLvl::AddSub,
-            Self::And(_) => BinOpLvl::And,
-            Self::Xor(_) => BinOpLvl::Xor,
-            Self::Or(_) => BinOpLvl::Or,
+            Self::BitAnd(_) => BinOpLvl::BitAnd,
+            Self::BitXor(_) => BinOpLvl::BitXor,
+            Self::BitOr(_) => BinOpLvl::BitOr,
             Self::Shl(_) | Self::Shr(_) => BinOpLvl::ShlShr,
             Self::Range(_) | Self::RangeInclusive(_) => BinOpLvl::Range,
+            Self::Eq(_) | Self::Ne(_) | Self::Lt(_) | Self::Gt(_) | Self::Le(_) | Self::Ge(_) => {
+                BinOpLvl::Eq
+            }
+            Self::LogicalAnd(_) => BinOpLvl::LogicalAnd,
+            Self::LogicalOr(_) => BinOpLvl::LogicalOr,
         }
     }
 }
