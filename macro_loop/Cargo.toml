@@ -1,7 +1,11 @@
 [package]
-edition = "2024"
-name    = "macro_loop"
-version = "0.1.0"
+categories  = [ "rust-patterns" ]
+description = "Macro to add loops and conditions over fragments"
+edition     = "2024"
+name        = "macro_loop"
+readme      = "../README.md"
+repository  = "https://github.com/Noam2Stein/macro-loop"
+version     = "0.1.0"
 
 [lib]
 proc-macro = true
