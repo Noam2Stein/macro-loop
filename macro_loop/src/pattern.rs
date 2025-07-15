@@ -7,23 +7,23 @@ use syn::{Error, Ident, Token, parse::Parse, punctuated::Punctuated, token::Brac
 use super::value::*;
 
 #[derive(Clone, Parse)]
-pub enum Param {
+pub enum Pattern {
     #[allow(private_interfaces)]
     #[peek(Ident, name = "identifer")]
-    Ident(ParamIdent),
+    Ident(PatternIdent),
 
     #[allow(private_interfaces)]
     #[peek(Bracket, name = "list")]
-    List(ParamList),
+    List(PatternList),
 }
 
-impl Param {
-    pub fn insert_values(
+impl Pattern {
+    pub fn insert_to_names(
         &self,
         value: Value,
         names: &mut HashMap<String, Value>,
     ) -> syn::Result<()> {
-        for (key, value) in self.values(value)? {
+        for (key, value) in self.names(value)? {
             names.insert(key.str, value);
         }
 
@@ -32,23 +32,23 @@ impl Param {
 }
 
 #[derive(Clone)]
-struct ParamIdent {
+struct PatternIdent {
     str: String,
     span: Span,
 }
 
 #[derive(Clone, Parse)]
-struct ParamList {
+struct PatternList {
     #[bracket]
     _brackets: Bracket,
 
     #[inside(_brackets)]
     #[call(Punctuated::parse_terminated)]
-    items: Punctuated<Param, Token![,]>,
+    items: Punctuated<Pattern, Token![,]>,
 }
 
-impl Param {
-    fn values(&self, value: Value) -> syn::Result<HashMap<ParamIdent, Value>> {
+impl Pattern {
+    fn names(&self, value: Value) -> syn::Result<HashMap<PatternIdent, Value>> {
         Ok(match self {
             Self::Ident(ident) => HashMap::from_iter([(ident.clone(), value)]),
 
@@ -69,7 +69,7 @@ impl Param {
                 }
 
                 for (item, value) in list.items.iter().zip(value.items) {
-                    let item_names = item.values(value)?;
+                    let item_names = item.names(value)?;
 
                     for (key, value) in &item_names {
                         if output.contains_key(key) {
@@ -86,7 +86,7 @@ impl Param {
     }
 }
 
-impl Parse for ParamIdent {
+impl Parse for PatternIdent {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let ident = input.parse::<Ident>()?;
 
@@ -97,14 +97,14 @@ impl Parse for ParamIdent {
     }
 }
 
-impl PartialEq for ParamIdent {
+impl PartialEq for PatternIdent {
     fn eq(&self, other: &Self) -> bool {
         self.str == other.str
     }
 }
-impl Eq for ParamIdent {}
+impl Eq for PatternIdent {}
 
-impl Hash for ParamIdent {
+impl Hash for PatternIdent {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.str.hash(state);
     }

@@ -1,5 +1,4 @@
 use macro_loop::macro_loop;
-use paste::paste;
 
 fn main() {}
 
@@ -25,11 +24,12 @@ struct Vec4 {
 }
 
 impl Vec2 {
-    macro_loop! { paste! {
-        @for X in 0..4 {
-            pub fn xy(self) -> X {
-                Vec2 { x: self.x, y: self.y }
+    macro_loop! {
+        @for X in [x, y] {
+            @let swizzle = @X + @X;
+            pub fn @swizzle(self) -> f32 {
+                self.@X
             }
         }
-    } }
+    }
 }

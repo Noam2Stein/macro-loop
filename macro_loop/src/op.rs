@@ -1,6 +1,7 @@
+use derive_quote_to_tokens::ToTokens;
 use syn::{RangeLimits, Token, parse::Parse, spanned::Spanned};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, ToTokens)]
 pub enum BinOp {
     Add(Token![+]),
     Sub(Token![-]),
@@ -18,7 +19,7 @@ pub enum BinOp {
     RangeInclusive(Token![..=]),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, ToTokens)]
 pub enum UnOp {
     Neg(Token![-]),
 
