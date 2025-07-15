@@ -7,7 +7,7 @@ use syn::{
     parse::{Parse, ParseStream, Parser},
 };
 
-use super::{frag::*, value::*};
+use super::{fragment::*, value::*};
 
 pub fn map_tokenstream(
     input: syn::parse::ParseStream,

@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use syn::parse::{ParseStream, Parser};
 
 mod expr;
-mod frag;
+mod fragment;
 mod map;
 mod op;
 mod pattern;
