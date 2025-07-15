@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ffi::CStr};
 
 use proc_macro2::{Group, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
@@ -45,8 +45,6 @@ impl ToTokensSpanned for Value {
         }
 
         match self {
-            Self::List(list) => list.to_tokens_spanned(span, tokens),
-
             Self::Bool(self_) => set_span!(self_),
             Self::Int(self_) => set_span!(self_),
             Self::Float(self_) => set_span!(self_),
@@ -55,6 +53,8 @@ impl ToTokensSpanned for Value {
             Self::CStr(self_) => set_span!(self_),
             Self::ByteStr(self_) => set_span!(self_),
             Self::Ident(self_) => set_span!(self_),
+
+            Self::List(list) => list.to_tokens_spanned(span, tokens),
         }
     }
 }
@@ -153,6 +153,18 @@ impl Value {
                         Self::str_bin_op(&lhs.value(), op, &rhs.value())?
                     }
 
+                    (Self::Char(lhs), Self::Char(rhs)) => {
+                        Self::char_bin_op(lhs.value(), op, rhs.value())?
+                    }
+
+                    (Self::CStr(lhs), Self::CStr(rhs)) => {
+                        Self::cstr_bin_op(&lhs.value(), op, &rhs.value())?
+                    }
+
+                    (Self::ByteStr(lhs), Self::ByteStr(rhs)) => {
+                        Self::byte_str_bin_op(&lhs.value(), op, &rhs.value())?
+                    }
+
                     (Self::Ident(lhs), Self::Ident(rhs)) => {
                         Self::ident_bin_op(&lhs.to_string(), op, &rhs.to_string())?
                     }
@@ -244,6 +256,45 @@ impl Value {
         Ok(match op {
             BinOp::Add(_) => string(lhs.to_string() + rhs, op.span()),
 
+            BinOp::Eq(_) => bool(lhs == rhs, op.span()),
+            BinOp::Ne(_) => bool(lhs != rhs, op.span()),
+            BinOp::Lt(_) => bool(lhs < rhs, op.span()),
+            BinOp::Gt(_) => bool(lhs > rhs, op.span()),
+            BinOp::Le(_) => bool(lhs <= rhs, op.span()),
+            BinOp::Ge(_) => bool(lhs >= rhs, op.span()),
+
+            _ => return Err(Error::new_spanned(op, "invalid operation")),
+        })
+    }
+
+    fn char_bin_op(lhs: char, op: BinOp, rhs: char) -> syn::Result<Self> {
+        Ok(match op {
+            BinOp::Eq(_) => bool(lhs == rhs, op.span()),
+            BinOp::Ne(_) => bool(lhs != rhs, op.span()),
+            BinOp::Lt(_) => bool(lhs < rhs, op.span()),
+            BinOp::Gt(_) => bool(lhs > rhs, op.span()),
+            BinOp::Le(_) => bool(lhs <= rhs, op.span()),
+            BinOp::Ge(_) => bool(lhs >= rhs, op.span()),
+
+            _ => return Err(Error::new_spanned(op, "invalid operation")),
+        })
+    }
+
+    fn cstr_bin_op(lhs: &CStr, op: BinOp, rhs: &CStr) -> syn::Result<Self> {
+        Ok(match op {
+            BinOp::Eq(_) => bool(lhs == rhs, op.span()),
+            BinOp::Ne(_) => bool(lhs != rhs, op.span()),
+            BinOp::Lt(_) => bool(lhs < rhs, op.span()),
+            BinOp::Gt(_) => bool(lhs > rhs, op.span()),
+            BinOp::Le(_) => bool(lhs <= rhs, op.span()),
+            BinOp::Ge(_) => bool(lhs >= rhs, op.span()),
+
+            _ => return Err(Error::new_spanned(op, "invalid operation")),
+        })
+    }
+
+    fn byte_str_bin_op(lhs: &[u8], op: BinOp, rhs: &[u8]) -> syn::Result<Self> {
+        Ok(match op {
             BinOp::Eq(_) => bool(lhs == rhs, op.span()),
             BinOp::Ne(_) => bool(lhs != rhs, op.span()),
             BinOp::Lt(_) => bool(lhs < rhs, op.span()),
