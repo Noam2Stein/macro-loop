@@ -1,17 +1,37 @@
 # macro_loop
 
-The `macro_loop` Rust crate provides structured macro logic, with loops, conditionals and variables over fragments,
-to make complex code generation readable and composable.
+`macro_loop` is a macro for writing repetitive Rust code using loops, conditionals, and bindings.
 
-For-loops emit their body per value:
+This is similar to the `paste`, `seq-macro` and `tt-call` crates,
+but attempts to make it more readable and scalable.
+
+`macro_loop` supports:
+- for loops - loops over list values which can be literals or identifiers.
+- if statements - declares a condition over fragments and only emits the body if the condition is met.
+- concat idents/strings - merges idents/string into one anywhere in the code.
+
+These features together allow for simple, readable and scalable macro logic.
+
+### Examples
+
+Concat:
 
 ```rust
-use macro_loop::macro_loop;
-
 macro_loop! {
-  @for N in 2..=4 {
-    struct @[Vec @N];
-  }
+    struct @[T ype];
+}
+
+// outputs:
+// struct Type;
+```
+
+For loops:
+
+```rust
+macro_loop! {
+    @for N in 2..=4 {
+        struct @[Vec @N];
+    }
 }
 
 // outputs:
@@ -19,56 +39,46 @@ macro_loop! {
 // struct Vec3;
 // struct Vec4;
 ```
+```rust
+macro_loop! {
+    // Generates combinations of T x N
+    @for N in 2..=4, T in [bool, i32, f32] {
+        struct @[@T x @N];
+    }
+}
 
-If-statements emit their body only if their condition is met:
+// outputs:
+// struct boolx2;
+// struct boolx3;
+// struct boolx4;
+// struct i32x2;
+// ...
+```
+
+If statements:
 
 ```rust
-use macro_loop::macro_loop;
-
+// Only prints if `$a` and `$b` are NOT equal.
 macro_rules! not_equal {
     ($a:ident $b:ident) => {
         macro_loop! {
-          @if $a != $b {
-            println!("{}", stringify!($a != $b))
-          }
+            @if $a != $b {
+                println!("{}", stringify!($a != $b))
+            }
         }
     };
 }
 
 fn main() {
     not_equal!(a a); // doesn't print
-    not_equal!(a b); // prints
+    not_equal!(a b); // does print
     not_equal!(b b); // doesn't print
 }
 ```
 
-Multiple parameters in for-loops emit their body per combination of values:
+Let statements:
 
 ```rust
-use macro_loop::macro_loop;
-
-macro_loop! {
-  @for F in [Bool, Int, Float], I in [Bool, Int, Float] {
-    @if @F != @I {
-      struct @[@F To @I];
-    }
-  }
-}
-
-// outputs:
-// struct BoolToInt;
-// struct BoolToFloat;
-// struct IntToBool;
-// struct IntToFloat;
-// struct FloatToBool;
-// struct FloatToInt;
-```
-
-Let-statements give names to fragments:
-
-```rust
-use macro_loop::macro_loop;
-
 #[derive(Debug, Clone, Copy)]
 struct Vec4 {
     x: f32,
@@ -77,6 +87,7 @@ struct Vec4 {
     w: f32,
 }
 
+// Declare all swizzle fns
 impl Vec4 {
     macro_loop! {
         @let components = [x, y, z, w];
@@ -90,20 +101,14 @@ impl Vec4 {
 }
 ```
 
-List fragments can be seperated:
+Patterns:
 
 ```rust
-use macro_loop::macro_loop;
-
 fn main() {
     macro_loop! {
         @for [KEY, VALUE] in [["one", 1], ["two", 2], ["three", 3]] {
             println!("{} => {}", @KEY, @VALUE);
         }
-
-        @let [A, B] = ['a', 'b'];
-
-        println!("{}, {}", @A, @B);
     }
 }
 ```

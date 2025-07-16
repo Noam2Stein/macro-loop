@@ -1,6 +1,6 @@
 [package]
 categories  = [ "rust-patterns" ]
-description = "Macro to add loops and conditions over fragments"
+description = "A macro for writing repetitive Rust code using loops, conditionals, and bindings"
 edition     = "2024"
 license     = "MIT OR Apache-2.0"
 name        = "macro_loop"
