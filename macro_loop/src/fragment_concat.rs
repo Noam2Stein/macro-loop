@@ -6,6 +6,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{
     Error, Ident, LitStr, Token,
+    ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Bracket,
@@ -20,15 +21,17 @@ pub struct FragmentConcat {
     #[inside(_brackets)]
     #[call(parse_segments)]
     segments: Vec<FragmentConcatSegment>,
+    #[inside(_brackets)]
     _type_arrow: Option<Token![=>]>,
+    #[inside(_brackets)]
     #[parse_if(_type_arrow.is_some())]
     type_: Option<Ident>,
 }
 
 #[derive(Clone, Parse, ToTokens)]
 enum FragmentConcatSegment {
-    #[peek(Ident, name = "an ident")]
-    Ident(Ident),
+    #[peek_with(|input: ParseStream| input.peek(Ident::peek_any), name = "an ident")]
+    Ident(#[call(Ident::parse_any)] Ident),
 
     #[peek(Token![@], name = "an ident")]
     Name(ExprName),
