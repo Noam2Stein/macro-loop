@@ -24,6 +24,16 @@ macro_loop! {
 // outputs:
 // struct Type;
 ```
+```rust
+macro_loop! {
+    fn main() {
+        println!(@[concat _ "strings" => str]);
+
+        // outputs:
+        // println!("concat_strings");
+    }
+}
+```
 
 For loops:
 

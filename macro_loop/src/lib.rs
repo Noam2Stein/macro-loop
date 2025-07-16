@@ -6,9 +6,9 @@ use syn::parse::{ParseStream, Parser};
 
 mod expr;
 mod fragment;
+mod fragment_concat;
 mod fragment_expr;
 mod fragment_for;
-mod fragment_ident;
 mod fragment_if;
 mod fragment_let;
 mod fragment_name;

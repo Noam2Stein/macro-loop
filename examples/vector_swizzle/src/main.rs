@@ -26,9 +26,23 @@ impl Vec4 {
     macro_loop! {
         @let components = [x, y, z, w];
 
+        // Get
         @for X in @components, Y in @components, Z in @components, W in @components {
             pub fn @[@X @Y @Z @W](self) -> Vec4 {
                 Vec4 { x: self.@X, y: self.@Y, z: self.@Z, w: self.@W }
+            }
+        }
+
+        // Set
+        // We want to skip all conflicting combinations (set_xxyz...)
+        @for X in @components, Y in @components, Z in @components, W in @components {
+            @if X != Y && X != Z && X != W && Y != Z && Y != W && Z != W {
+                pub fn @[set_ @X @Y @Z @W](&mut self, value: Vec4) {
+                    self.@X = value.x;
+                    self.@Y = value.y;
+                    self.@Z = value.z;
+                    self.@W = value.w;
+                }
             }
         }
     }

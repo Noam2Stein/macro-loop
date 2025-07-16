@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use derive_quote_to_tokens::ToTokens;
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
-use quote::TokenStreamExt;
+use quote::ToTokens;
 use syn::{
-    Error, Ident, Token,
+    Error, Ident, LitStr, Token,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Bracket,
@@ -14,16 +14,19 @@ use syn::{
 use super::{expr::*, fragment::*, value::*};
 
 #[derive(Clone, Parse)]
-pub struct FragmentIdent {
+pub struct FragmentConcat {
     #[bracket]
     _brackets: Bracket,
     #[inside(_brackets)]
-    #[call(parse_repeated_nonempty)]
-    segments: Vec<FragmentIdentSegment>,
+    #[call(parse_segments)]
+    segments: Vec<FragmentConcatSegment>,
+    _type_arrow: Option<Token![=>]>,
+    #[parse_if(_type_arrow.is_some())]
+    type_: Option<Ident>,
 }
 
 #[derive(Clone, Parse, ToTokens)]
-enum FragmentIdentSegment {
+enum FragmentConcatSegment {
     #[peek(Ident, name = "an ident")]
     Ident(Ident),
 
@@ -31,7 +34,7 @@ enum FragmentIdentSegment {
     Name(ExprName),
 }
 
-impl ApplyFragment for FragmentIdent {
+impl ApplyFragment for FragmentConcat {
     fn apply(
         self,
         names: &mut HashMap<String, Value>,
@@ -45,17 +48,30 @@ impl ApplyFragment for FragmentIdent {
 
         let span = self.segments.iter().map(|seg| seg.span()).nth(0).unwrap();
 
-        tokens.append(Ident::new(&str, span));
+        let value = match self
+            .type_
+            .as_ref()
+            .map(|type_| type_.to_string())
+            .as_ref()
+            .map(|str| str.as_str())
+        {
+            Some("str") => Value::Str(LitStr::new(&str, span)),
+            None => Value::Ident(Ident::new(&str, span)),
+
+            _ => return Err(Error::new_spanned(self.type_, "invalid concat type")),
+        };
+
+        value.to_tokens(tokens);
 
         Ok(())
     }
 }
 
-impl FragmentIdentSegment {
+impl FragmentConcatSegment {
     fn try_to_string(&self, names: &HashMap<String, Value>) -> syn::Result<String> {
         Ok(match self {
-            FragmentIdentSegment::Ident(ident) => ident.to_string(),
-            FragmentIdentSegment::Name(name) => {
+            FragmentConcatSegment::Ident(ident) => ident.to_string(),
+            FragmentConcatSegment::Name(name) => {
                 let value = name.find(names)?;
 
                 match value {
@@ -76,12 +92,12 @@ impl FragmentIdentSegment {
     }
 }
 
-fn parse_repeated_nonempty<T: Parse>(input: ParseStream) -> syn::Result<Vec<T>> {
+fn parse_segments<T: Parse>(input: ParseStream) -> syn::Result<Vec<T>> {
     let mut items = Vec::new();
 
     items.push(input.parse()?);
 
-    while !input.is_empty() {
+    while !input.is_empty() && !input.peek(Token![=>]) {
         items.push(input.parse()?);
     }
     Ok(items)

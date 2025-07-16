@@ -8,7 +8,7 @@ use syn::{
 };
 
 use super::{
-    fragment_expr::*, fragment_for::*, fragment_ident::*, fragment_if::*, fragment_let::*,
+    fragment_concat::*, fragment_expr::*, fragment_for::*, fragment_if::*, fragment_let::*,
     fragment_name::*, value::*,
 };
 
@@ -32,7 +32,7 @@ pub enum Fragment {
 
     #[allow(private_interfaces)]
     #[peek(Bracket, name = "`[]`")]
-    Ident(FragmentIdent),
+    Ident(FragmentConcat),
 
     #[peek(Ident, name = "a name")]
     Name(FragmentName),
