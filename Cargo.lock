@@ -29,6 +29,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c91ae510829160d5cfb19eb4ae7b6e01d44b767ca8f727c6cee936e53cc9ae5"
 
 [[package]]
+name = "enumerate"
+version = "0.1.0"
+dependencies = [
+ "macro_loop",
+]
+
+[[package]]
 name = "macro_loop"
 version = "0.2.0"
 dependencies = [

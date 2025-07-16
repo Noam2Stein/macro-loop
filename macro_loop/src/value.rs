@@ -180,6 +180,49 @@ impl Value {
                     _ => return Err(Error::new_spanned(op, "invalid operation")),
                 }
             }
+
+            Expr::Method(expr) => {
+                let base = Value::from_expr(*expr.base, names.clone())?;
+                let inputs = expr
+                    .inputs
+                    .into_iter()
+                    .map(|input| Value::from_expr(input, names.clone()))
+                    .collect::<syn::Result<_>>()?;
+
+                match expr.method.to_string().as_str() {
+                    "enumerate" => Self::enumerate_method(base, expr.method.span(), inputs)?,
+
+                    _ => return Err(Error::new_spanned(expr.method, "Unknown method")),
+                }
+            }
+        })
+    }
+
+    fn enumerate_method(base: Value, span: Span, inputs: Vec<Value>) -> syn::Result<Self> {
+        if inputs.len() != 0 {
+            return Err(Error::new(span, "expected zero arguments"));
+        }
+
+        Ok(match base {
+            Self::List(base) => Self::List(ValueList {
+                span: base.span,
+                items: base
+                    .items
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, item)| {
+                        Value::List(ValueList {
+                            span: item.span(),
+                            items: vec![
+                                Self::Int(LitInt::new(&idx.to_string(), item.span())),
+                                item,
+                            ],
+                        })
+                    })
+                    .collect(),
+            }),
+
+            _ => return Err(Error::new_spanned(base, "expected a list")),
         })
     }
 

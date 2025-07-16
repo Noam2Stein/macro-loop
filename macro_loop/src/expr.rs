@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use derive_quote_to_tokens::ToTokens;
 use derive_syn_parse::Parse;
 use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
-use quote::{ToTokens, TokenStreamExt};
+use quote::{ToTokens, TokenStreamExt, quote};
 use syn::{
     Error, Ident, LitBool, LitByte, LitByteStr, LitCStr, LitChar, LitFloat, LitInt, LitStr, Token,
     parse::{Parse, Parser},
     parse2,
     punctuated::Punctuated,
     spanned::Spanned,
+    token::Bracket,
 };
 
 use super::{ops::*, value::*};
@@ -28,6 +29,7 @@ pub enum Expr {
     List(ExprList),
     Bin(ExprBin),
     Un(ExprUn),
+    Method(ExprMethod),
 
     Name(ExprName),
 }
@@ -55,6 +57,13 @@ pub struct ExprUn {
 pub struct ExprName {
     pub _at_token: Token![@],
     pub name: Ident,
+}
+
+#[derive(Clone)]
+pub struct ExprMethod {
+    pub base: Box<Expr>,
+    pub method: Ident,
+    pub inputs: Vec<Expr>,
 }
 
 impl Parse for Expr {
@@ -129,6 +138,20 @@ impl ToTokens for ExprUn {
         tokens.append(TokenTree::Group(group));
     }
 }
+impl ToTokens for ExprMethod {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.base.to_tokens(tokens);
+        tokens.append_all(quote! { . });
+        self.method.to_tokens(tokens);
+
+        let mut group_stream = TokenStream::new();
+        Punctuated::<_, Token![,]>::from_iter(&self.inputs).to_tokens(&mut group_stream);
+
+        let group = Group::new(proc_macro2::Delimiter::Parenthesis, group_stream);
+
+        tokens.append(TokenTree::Group(group));
+    }
+}
 
 impl ExprName {
     pub fn find(&self, names: &HashMap<String, Value>) -> syn::Result<Value> {
@@ -144,6 +167,51 @@ impl ExprName {
 
 impl Expr {
     fn parse_single(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut output = Self::parse_base(input)?;
+
+        loop {
+            if input.peek(Token![.]) && !input.peek(Token![..]) {
+                input.parse::<Token![.]>()?;
+
+                let method = input.parse::<Ident>()?;
+
+                let inputs = input.parse::<Group>()?;
+                if inputs.delimiter() != Delimiter::Parenthesis {
+                    return Err(Error::new(inputs.span(), "expected `()`"));
+                }
+
+                let inputs = Punctuated::<Expr, Token![,]>::parse_terminated
+                    .parse2(inputs.stream())?
+                    .into_iter()
+                    .collect();
+
+                output = Self::Method(ExprMethod {
+                    base: Box::new(output.clone()),
+                    method,
+                    inputs,
+                });
+
+                continue;
+            }
+
+            if input.peek(Bracket) {
+                let group = input.parse::<Group>()?;
+
+                let idx = Expr::parse.parse2(group.stream())?;
+
+                output = Self::Method(ExprMethod {
+                    base: Box::new(output.clone()),
+                    method: Ident::new("index", group.span()),
+                    inputs: vec![idx],
+                })
+            }
+
+            break;
+        }
+
+        Ok(output)
+    }
+    fn parse_base(input: syn::parse::ParseStream) -> syn::Result<Self> {
         if let Some(op) = UnOp::option_parse(input) {
             let base = Box::new(Expr::parse_single(input)?);
 
