@@ -9,7 +9,9 @@ fn main() {
         z: 3.0,
         w: 4.0,
     };
-    let swizzled = vector.yxwy();
+    let mut swizzled = vector.yxwy();
+
+    swizzled.set_xwyz(swizzled);
 
     println!("{swizzled:?}");
 }
@@ -36,7 +38,11 @@ impl Vec4 {
         // Set
         // We want to skip all conflicting combinations (set_xxyz...)
         @for X in @components, Y in @components, Z in @components, W in @components {
-            @if X != Y && X != Z && X != W && Y != Z && Y != W && Z != W {
+            @if
+                @X != @Y && @X != @Z && @X != @W
+                && @Y != @Z && @Y != @W
+                && @Z != @W
+            {
                 pub fn @[set_ @X @Y @Z @W](&mut self, value: Vec4) {
                     self.@X = value.x;
                     self.@Y = value.y;
