@@ -30,7 +30,7 @@ checksum = "4c91ae510829160d5cfb19eb4ae7b6e01d44b767ca8f727c6cee936e53cc9ae5"
 
 [[package]]
 name = "macro_loop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "derive-quote-to-tokens",
  "derive-syn-parse",
