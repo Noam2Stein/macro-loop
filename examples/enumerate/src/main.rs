@@ -25,5 +25,13 @@ macro_loop! {
                 self.array[@idx]
             }
         }
+
+        @for start in 0..3, end in @start..3 {
+            @let components = [x, y, z][@start..=@end];
+
+            fn @[@components _ref](&self) -> &[f32] {
+                &self.array[@start..=@end]
+            }
+        }
     }
 }

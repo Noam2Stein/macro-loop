@@ -191,9 +191,32 @@ impl Value {
 
                 match expr.method.to_string().as_str() {
                     "enumerate" => Self::enumerate_method(base, expr.method.span(), inputs)?,
+                    "index" => Self::index_method(base, expr.method.span(), inputs)?,
 
                     _ => return Err(Error::new_spanned(expr.method, "Unknown method")),
                 }
+            }
+        })
+    }
+
+    pub fn try_to_string(&self) -> syn::Result<String> {
+        Ok(match self {
+            Self::Bool(lit) => lit.value.to_string(),
+            Self::Int(lit) => lit.base10_parse::<u128>().unwrap().to_string(),
+            Self::Str(lit) => lit.value(),
+            Self::Char(lit) => lit.value().to_string(),
+            Self::CStr(lit) => lit.value().to_str().unwrap().to_string(),
+            Self::ByteStr(lit) => String::from_utf8(lit.value()).unwrap(),
+            Self::Ident(ident) => ident.to_string(),
+
+            Self::List(list) => list
+                .items
+                .iter()
+                .map(|item| item.try_to_string())
+                .collect::<syn::Result<String>>()?,
+
+            _ => {
+                return Err(Error::new_spanned(self, "not an identifier value"));
             }
         })
     }
@@ -221,6 +244,40 @@ impl Value {
                     })
                     .collect(),
             }),
+
+            _ => return Err(Error::new_spanned(base, "expected a list")),
+        })
+    }
+
+    fn index_method(base: Value, span: Span, inputs: Vec<Value>) -> syn::Result<Self> {
+        if inputs.len() != 1 {
+            return Err(Error::new(span, "expected one argument"));
+        }
+
+        let idx = match &inputs[0] {
+            Value::Int(int) => int.base10_parse::<usize>().unwrap(),
+
+            Value::List(list) => {
+                return Ok(Self::List(ValueList {
+                    span: list.span,
+                    items: list
+                        .clone()
+                        .items
+                        .into_iter()
+                        .map(|idx| Self::index_method(base.clone(), span, vec![idx]))
+                        .collect::<syn::Result<_>>()?,
+                }));
+            }
+
+            input => return Err(Error::new_spanned(input, "expected an int")),
+        };
+
+        Ok(match base {
+            Self::List(base) => match base.items.get(idx) {
+                Some(item) => item.clone(),
+
+                None => return Err(Error::new_spanned(&inputs[0], "out of bounds")),
+            },
 
             _ => return Err(Error::new_spanned(base, "expected a list")),
         })

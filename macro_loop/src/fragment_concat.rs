@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 
-use derive_quote_to_tokens::ToTokens;
 use derive_syn_parse::Parse;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use syn::{
     Error, Ident, LitStr, Token,
     ext::IdentExt,
-    parse::{Parse, ParseStream},
-    spanned::Spanned,
+    parse::{Parse, ParseStream, Parser},
     token::Bracket,
 };
 
@@ -20,7 +18,7 @@ pub struct FragmentConcat {
     _brackets: Bracket,
     #[inside(_brackets)]
     #[call(parse_segments)]
-    segments: Vec<FragmentConcatSegment>,
+    segments: Vec<Segment>,
     #[inside(_brackets)]
     _type_arrow: Option<Token![=>]>,
     #[inside(_brackets)]
@@ -28,13 +26,19 @@ pub struct FragmentConcat {
     type_: Option<Ident>,
 }
 
-#[derive(Clone, Parse, ToTokens)]
-enum FragmentConcatSegment {
+#[derive(Clone, Parse)]
+enum Segment {
     #[peek_with(|input: ParseStream| input.peek(Ident::peek_any), name = "an ident")]
     Ident(#[call(Ident::parse_any)] Ident),
 
     #[peek(Token![@], name = "an ident")]
-    Name(ExprName),
+    Fragment(SegmentFragment),
+}
+
+#[derive(Clone, Parse)]
+struct SegmentFragment {
+    _at_token: Token![@],
+    frag: Fragment,
 }
 
 impl ApplyFragment for FragmentConcat {
@@ -70,28 +74,30 @@ impl ApplyFragment for FragmentConcat {
     }
 }
 
-impl FragmentConcatSegment {
+impl Segment {
     fn try_to_string(&self, names: &HashMap<String, Value>) -> syn::Result<String> {
         Ok(match self {
-            FragmentConcatSegment::Ident(ident) => ident.to_string(),
-            FragmentConcatSegment::Name(name) => {
-                let value = name.find(names)?;
+            Segment::Ident(ident) => ident.to_string(),
+            Segment::Fragment(frag) => {
+                let mut frag_output = TokenStream::new();
+                frag.frag
+                    .clone()
+                    .apply(&mut names.clone(), &mut frag_output)?;
 
-                match value {
-                    Value::Bool(lit) => lit.value.to_string(),
-                    Value::Int(lit) => lit.base10_parse::<u128>().unwrap().to_string(),
-                    Value::Str(lit) => lit.value(),
-                    Value::Char(lit) => lit.value().to_string(),
-                    Value::CStr(lit) => lit.value().to_str().unwrap().to_string(),
-                    Value::ByteStr(lit) => String::from_utf8(lit.value()).unwrap(),
-                    Value::Ident(ident) => ident.to_string(),
+                let expr = Expr::parse.parse2(frag_output)?;
 
-                    _ => {
-                        return Err(Error::new_spanned(value, "not an identifier value"));
-                    }
-                }
+                let value = Value::from_expr(expr, names.clone())?;
+
+                value.try_to_string()?
             }
         })
+    }
+
+    fn span(&self) -> Span {
+        match self {
+            Self::Ident(self_) => self_.span(),
+            Segment::Fragment(self_) => self_._at_token.span,
+        }
     }
 }
 

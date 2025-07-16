@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use derive_quote_to_tokens::ToTokens;
 use derive_syn_parse::Parse;
 use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
@@ -13,7 +11,7 @@ use syn::{
     token::Bracket,
 };
 
-use super::{ops::*, value::*};
+use super::ops::*;
 
 #[derive(Clone, ToTokens)]
 pub enum Expr {
@@ -153,25 +151,13 @@ impl ToTokens for ExprMethod {
     }
 }
 
-impl ExprName {
-    pub fn find(&self, names: &HashMap<String, Value>) -> syn::Result<Value> {
-        match names.get(&self.name.to_string()) {
-            Some(value) => Ok(value.clone()),
-            None => Err(Error::new_spanned(
-                &self.name,
-                format!("can't find {}", self.name),
-            )),
-        }
-    }
-}
-
 impl Expr {
     fn parse_single(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut output = Self::parse_base(input)?;
 
         loop {
             if input.peek(Token![.]) && !input.peek(Token![..]) {
-                input.parse::<Token![.]>()?;
+                input.parse::<Token![.]>().unwrap();
 
                 let method = input.parse::<Ident>()?;
 
