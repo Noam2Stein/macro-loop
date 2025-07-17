@@ -3,16 +3,13 @@ use std::ffi::CStr;
 use proc_macro2::{Group, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
 use syn::{
-    Error, Ident, LitBool, LitByteStr, LitCStr, LitChar, LitFloat, LitInt, LitStr, Token,
-    parse::{ParseStream, Parser},
-    parse2,
+    Error, Ident, Lit, LitBool, LitByteStr, LitCStr, LitChar, LitFloat, LitInt, LitStr, Token,
+    parse::{Parse, Parser},
     punctuated::Punctuated,
     spanned::Spanned,
 };
 
-use crate::map::map_tokenstream;
-
-use super::{expr::*, namespace::*, ops::*, to_tokens_spanned::*};
+use super::{expr::*, fragment::*, namespace::*, ops::*, to_tokens_spanned::*};
 
 #[derive(Clone)]
 pub enum Value {
@@ -103,70 +100,60 @@ impl ToTokens for ValueList {
 }
 
 impl Value {
-    pub fn from_expr(expr: Expr, namespace: &Namespace) -> syn::Result<Self> {
-        let map_fn = |input: ParseStream| map_tokenstream(input, namespace);
-        let expr = parse2::<Expr>(map_fn.parse2(expr.to_token_stream())?)?;
-
+    pub fn from_expr(expr: &Expr, namespace: &Namespace) -> syn::Result<Self> {
         Ok(match expr {
-            Expr::Bool(self_) => Self::Bool(self_),
-            Expr::Int(self_) => Self::Int(self_),
-            Expr::Float(self_) => Self::Float(self_),
-            Expr::Str(self_) => Self::Str(self_),
-            Expr::Char(self_) => Self::Char(self_),
-            Expr::CStr(self_) => Self::CStr(self_),
-            Expr::ByteStr(self_) => Self::ByteStr(self_),
-            Expr::Ident(self_) => Self::Ident(self_),
+            Expr::Paren(inner) => Self::from_expr(inner, namespace)?,
+
+            Expr::Value(value) => value.clone(),
 
             Expr::List(list) => Self::List(ValueList {
                 span: list.span,
                 items: list
                     .items
-                    .into_iter()
+                    .iter()
                     .map(|item| Self::from_expr(item, namespace))
                     .collect::<syn::Result<_>>()?,
             }),
 
-            Expr::Name(_) => unreachable!(),
-
             Expr::Bin(ExprBin { lhs, op, rhs }) => {
-                let lhs = Value::from_expr(*lhs, namespace)?;
-                let rhs = Value::from_expr(*rhs, namespace)?;
+                let lhs = Value::from_expr(lhs, namespace)?;
+                let rhs = Value::from_expr(rhs, namespace)?;
 
                 match (lhs, rhs) {
                     (Self::Bool(lhs), Self::Bool(rhs)) => {
-                        Self::bool_bin_op(lhs.value, op, rhs.value)?
+                        Self::bool_bin_op(lhs.value, *op, rhs.value)?
                     }
 
                     (Self::Int(lhs), Self::Int(rhs)) => Self::int_bin_op(
                         lhs.base10_parse::<u128>()?,
-                        op,
+                        *op,
                         rhs.base10_parse::<u128>()?,
                     )?,
 
                     (Self::Float(lhs), Self::Float(rhs)) => Self::float_bin_op(
                         lhs.base10_parse::<f64>()?,
-                        op,
+                        *op,
                         rhs.base10_parse::<f64>()?,
                     )?,
 
                     (Self::Str(lhs), Self::Str(rhs)) => {
-                        Self::str_bin_op(&lhs.value(), op, &rhs.value())?
+                        Self::str_bin_op(&lhs.value(), *op, &rhs.value())?
                     }
 
                     (Self::Char(lhs), Self::Char(rhs)) => {
-                        Self::char_bin_op(lhs.value(), op, rhs.value())?
+                        Self::char_bin_op(lhs.value(), *op, rhs.value())?
                     }
 
                     (Self::CStr(lhs), Self::CStr(rhs)) => {
-                        Self::cstr_bin_op(&lhs.value(), op, &rhs.value())?
+                        Self::cstr_bin_op(&lhs.value(), *op, &rhs.value())?
                     }
 
                     (Self::ByteStr(lhs), Self::ByteStr(rhs)) => {
-                        Self::byte_str_bin_op(&lhs.value(), op, &rhs.value())?
+                        Self::byte_str_bin_op(&lhs.value(), *op, &rhs.value())?
                     }
 
                     (Self::Ident(lhs), Self::Ident(rhs)) => {
-                        Self::ident_bin_op(&lhs.to_string(), op, &rhs.to_string())?
+                        Self::ident_bin_op(&lhs.to_string(), *op, &rhs.to_string())?
                     }
 
                     _ => return Err(Error::new_spanned(op, "invalid operation")),
@@ -174,7 +161,7 @@ impl Value {
             }
 
             Expr::Un(ExprUn { op, base }) => {
-                let base = Value::from_expr(*base, namespace)?;
+                let base = Value::from_expr(base, namespace)?;
 
                 match base {
                     _ => return Err(Error::new_spanned(op, "invalid operation")),
@@ -182,10 +169,10 @@ impl Value {
             }
 
             Expr::Method(expr) => {
-                let base = Value::from_expr(*expr.base, namespace)?;
+                let base = Value::from_expr(&expr.base, namespace)?;
                 let inputs = expr
                     .inputs
-                    .into_iter()
+                    .iter()
                     .map(|input| Value::from_expr(input, namespace))
                     .collect::<syn::Result<_>>()?;
 
@@ -193,9 +180,36 @@ impl Value {
                     "enumerate" => Self::enumerate_method(base, expr.method.span(), inputs)?,
                     "index" => Self::index_method(base, expr.method.span(), inputs)?,
 
-                    _ => return Err(Error::new_spanned(expr.method, "Unknown method")),
+                    _ => return Err(Error::new_spanned(&expr.method, "Unknown method")),
                 }
             }
+
+            Expr::Frag(ExprFrag { _at_token: _, frag }) => {
+                let mut namespace = namespace.fork();
+
+                let mut output = TokenStream::new();
+                frag.apply(&mut namespace, &mut output)?;
+
+                let expr = Expr::parse.parse2(output)?;
+
+                Value::from_expr(&expr, &namespace)?
+            }
+        })
+    }
+
+    pub fn from_lit(lit: Lit) -> syn::Result<Self> {
+        Ok(match lit {
+            Lit::Bool(lit) => Self::Bool(lit),
+            Lit::ByteStr(lit) => Self::ByteStr(lit),
+            Lit::CStr(lit) => Self::CStr(lit),
+            Lit::Char(lit) => Self::Char(lit),
+            Lit::Float(lit) => Self::Float(lit),
+            Lit::Int(lit) => Self::Int(lit),
+            Lit::Str(lit) => Self::Str(lit),
+
+            Lit::Byte(lit) => Self::Int(LitInt::new(&lit.value().to_string(), lit.span())),
+
+            _ => return Err(Error::new(lit.span(), "unsupported literal")),
         })
     }
 

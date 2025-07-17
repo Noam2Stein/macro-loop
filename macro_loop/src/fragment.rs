@@ -1,5 +1,6 @@
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use syn::{
     Ident, Token,
     token::{Bracket, Paren},
@@ -10,38 +11,41 @@ use super::{
     fragment_name::*, namespace::*,
 };
 
-#[derive(Clone, Parse)]
-pub enum Fragment {
+#[derive(Parse)]
+pub enum Frag {
     #[allow(private_interfaces)]
     #[peek(Token![for], name = "for")]
-    For(FragmentFor),
+    For(FragFor),
 
     #[allow(private_interfaces)]
     #[peek(Token![if], name = "if")]
-    If(FragmentIf),
+    If(FragIf),
 
     #[allow(private_interfaces)]
     #[peek(Token![let], name = "let")]
-    Let(FragmentLet),
+    Let(FragLet),
 
     #[allow(private_interfaces)]
     #[peek(Paren, name = "`()`")]
-    Expr(FragmentExpr),
+    Expr(FragExpr),
 
     #[allow(private_interfaces)]
     #[peek(Bracket, name = "`[]`")]
-    Ident(FragmentConcat),
+    Ident(FragConcat),
 
     #[peek(Ident, name = "a name")]
-    Name(FragmentName),
+    Name(FragName),
+
+    #[peek(Token![@], name = "`@`")]
+    Cancel(Token![@]),
 }
 
 pub trait ApplyFragment {
-    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()>;
+    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()>;
 }
 
-impl ApplyFragment for Fragment {
-    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+impl ApplyFragment for Frag {
+    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
         match self {
             Self::For(self_) => self_.apply(namespace, tokens),
             Self::If(self_) => self_.apply(namespace, tokens),
@@ -49,6 +53,8 @@ impl ApplyFragment for Fragment {
             Self::Expr(self_) => self_.apply(namespace, tokens),
             Self::Ident(self_) => self_.apply(namespace, tokens),
             Self::Name(self_) => self_.apply(namespace, tokens),
+
+            Self::Cancel(self_) => Ok(self_.to_tokens(tokens)),
         }
     }
 }

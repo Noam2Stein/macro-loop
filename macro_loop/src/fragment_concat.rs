@@ -10,8 +10,8 @@ use syn::{
 
 use super::{expr::*, fragment::*, namespace::*, value::*};
 
-#[derive(Clone, Parse)]
-pub struct FragmentConcat {
+#[derive(Parse)]
+pub struct FragConcat {
     #[bracket]
     _brackets: Bracket,
     #[inside(_brackets)]
@@ -24,7 +24,7 @@ pub struct FragmentConcat {
     type_: Option<Ident>,
 }
 
-#[derive(Clone, Parse)]
+#[derive(Parse)]
 enum Segment {
     #[peek_with(|input: ParseStream| input.peek(Ident::peek_any), name = "an ident")]
     Ident(#[call(Ident::parse_any)] Ident),
@@ -33,14 +33,14 @@ enum Segment {
     Fragment(SegmentFragment),
 }
 
-#[derive(Clone, Parse)]
+#[derive(Parse)]
 struct SegmentFragment {
     _at_token: Token![@],
-    frag: Fragment,
+    frag: Frag,
 }
 
-impl ApplyFragment for FragmentConcat {
-    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+impl ApplyFragment for FragConcat {
+    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
         let str = self
             .segments
             .iter()
@@ -59,7 +59,7 @@ impl ApplyFragment for FragmentConcat {
             Some("str") => Value::Str(LitStr::new(&str, span)),
             None => Value::Ident(Ident::new(&str, span)),
 
-            _ => return Err(Error::new_spanned(self.type_, "invalid concat type")),
+            _ => return Err(Error::new_spanned(&self.type_, "invalid concat type")),
         };
 
         value.to_tokens(tokens);
@@ -76,11 +76,11 @@ impl Segment {
                 let mut namespace = namespace.fork();
 
                 let mut frag_output = TokenStream::new();
-                frag.frag.clone().apply(&mut namespace, &mut frag_output)?;
+                frag.frag.apply(&mut namespace, &mut frag_output)?;
 
                 let expr = Expr::parse.parse2(frag_output)?;
 
-                let value = Value::from_expr(expr, &namespace)?;
+                let value = Value::from_expr(&expr, &namespace)?;
 
                 value.try_to_string()?
             }

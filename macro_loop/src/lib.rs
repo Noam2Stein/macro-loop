@@ -2,7 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 use proc_macro2::TokenStream;
-use syn::parse::{ParseStream, Parser};
+use syn::parse::{Parse, ParseStream, Parser};
 
 mod expr;
 mod fragment;
@@ -12,7 +12,7 @@ mod fragment_for;
 mod fragment_if;
 mod fragment_let;
 mod fragment_name;
-mod map;
+mod name_stream;
 mod namespace;
 mod ops;
 mod pattern;
@@ -117,6 +117,8 @@ pub fn macro_loop(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     .into()
 }
 
-fn macro_loop_(parser: ParseStream) -> syn::Result<TokenStream> {
-    map::map_tokenstream(parser, &namespace::Namespace::new())
+fn macro_loop_(input: ParseStream) -> syn::Result<TokenStream> {
+    let name_stream = name_stream::NameStream::parse(input)?;
+
+    name_stream.resolve(&namespace::Namespace::new())
 }
