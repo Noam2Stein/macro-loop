@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use derive_syn_parse::Parse;
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
@@ -10,7 +8,7 @@ use syn::{
     token::Bracket,
 };
 
-use super::{expr::*, fragment::*, value::*};
+use super::{expr::*, fragment::*, namespace::*, value::*};
 
 #[derive(Clone, Parse)]
 pub struct FragmentConcat {
@@ -42,15 +40,11 @@ struct SegmentFragment {
 }
 
 impl ApplyFragment for FragmentConcat {
-    fn apply(
-        self,
-        names: &mut HashMap<String, Value>,
-        tokens: &mut TokenStream,
-    ) -> syn::Result<()> {
+    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
         let str = self
             .segments
             .iter()
-            .map(|seg| seg.try_to_string(names))
+            .map(|seg| seg.try_to_string(namespace))
             .collect::<syn::Result<String>>()?;
 
         let span = self.segments.iter().map(|seg| seg.span()).nth(0).unwrap();
@@ -75,18 +69,18 @@ impl ApplyFragment for FragmentConcat {
 }
 
 impl Segment {
-    fn try_to_string(&self, names: &HashMap<String, Value>) -> syn::Result<String> {
+    fn try_to_string(&self, namespace: &Namespace) -> syn::Result<String> {
         Ok(match self {
             Segment::Ident(ident) => ident.to_string(),
             Segment::Fragment(frag) => {
+                let mut namespace = namespace.fork();
+
                 let mut frag_output = TokenStream::new();
-                frag.frag
-                    .clone()
-                    .apply(&mut names.clone(), &mut frag_output)?;
+                frag.frag.clone().apply(&mut namespace, &mut frag_output)?;
 
                 let expr = Expr::parse.parse2(frag_output)?;
 
-                let value = Value::from_expr(expr, names.clone())?;
+                let value = Value::from_expr(expr, &namespace)?;
 
                 value.try_to_string()?
             }

@@ -13,6 +13,7 @@ mod fragment_if;
 mod fragment_let;
 mod fragment_name;
 mod map;
+mod namespace;
 mod ops;
 mod pattern;
 mod to_tokens_spanned;
@@ -117,5 +118,5 @@ pub fn macro_loop(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn macro_loop_(parser: ParseStream) -> syn::Result<TokenStream> {
-    map::map_tokenstream(parser, std::collections::HashMap::new())
+    map::map_tokenstream(parser, &namespace::Namespace::new())
 }

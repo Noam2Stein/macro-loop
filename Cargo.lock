@@ -37,7 +37,7 @@ dependencies = [
 
 [[package]]
 name = "macro_loop"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "derive-quote-to-tokens",
  "derive-syn-parse",

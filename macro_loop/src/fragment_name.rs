@@ -1,12 +1,10 @@
-use std::collections::HashMap;
-
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
-use syn::{Error, Ident};
+use syn::Ident;
 
 use crate::to_tokens_spanned::ToTokensSpanned;
 
-use super::{fragment::*, value::*};
+use super::{fragment::*, namespace::*};
 
 #[derive(Clone, Parse)]
 pub struct FragmentName {
@@ -14,20 +12,8 @@ pub struct FragmentName {
 }
 
 impl ApplyFragment for FragmentName {
-    fn apply(
-        self,
-        names: &mut HashMap<String, Value>,
-        tokens: &mut TokenStream,
-    ) -> syn::Result<()> {
-        let value = match names.get(&self.name.to_string()) {
-            Some(value) => value,
-            None => {
-                return Err(Error::new_spanned(
-                    &self.name,
-                    format!("can't find {}", self.name),
-                ));
-            }
-        };
+    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+        let value = namespace.get(&self.name)?;
 
         value.to_tokens_spanned(self.name.span(), tokens);
 

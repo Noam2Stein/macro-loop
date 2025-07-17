@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
 use quote::TokenStreamExt;
@@ -10,7 +8,7 @@ use syn::{
     token::Brace,
 };
 
-use super::{expr::*, fragment::*, map::*, pattern::*, value::*};
+use super::{expr::*, fragment::*, map::*, namespace::*, pattern::*, value::*};
 
 #[derive(Clone, Parse)]
 pub struct FragmentFor {
@@ -31,13 +29,9 @@ struct FragmentForSegment {
 }
 
 impl ApplyFragment for FragmentFor {
-    fn apply(
-        mut self,
-        names: &mut HashMap<String, Value>,
-        tokens: &mut TokenStream,
-    ) -> syn::Result<()> {
+    fn apply(mut self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
         if self.segments.len() == 0 {
-            let map_fn = |input: ParseStream| map_tokenstream(input, names.clone());
+            let map_fn = |input: ParseStream| map_tokenstream(input, &namespace);
             tokens.append_all(map_fn.parse2(self.body.clone())?);
 
             return Ok(());
@@ -45,7 +39,7 @@ impl ApplyFragment for FragmentFor {
 
         let segment = self.segments.remove(0);
 
-        let values = Value::from_expr(segment.items.clone(), names.clone())?;
+        let values = Value::from_expr(segment.items.clone(), &namespace)?;
 
         let values = if let Value::List(values) = values {
             values.items
@@ -54,11 +48,11 @@ impl ApplyFragment for FragmentFor {
         };
 
         for value in values {
-            let mut names = names.clone();
+            let mut namespace = namespace.fork();
 
-            segment.pat.insert_to_names(value, &mut names)?;
+            segment.pat.insert_to_namespace(value, &mut namespace)?;
 
-            self.clone().apply(&mut names, tokens)?;
+            self.clone().apply(&mut namespace, tokens)?;
         }
 
         Ok(())

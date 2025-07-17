@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use proc_macro2::{Group, TokenStream, TokenTree};
 use quote::TokenStreamExt;
 use syn::{
@@ -7,12 +5,13 @@ use syn::{
     parse::{Parse, ParseStream, Parser},
 };
 
-use super::{fragment::*, value::*};
+use super::{fragment::*, namespace::*};
 
 pub fn map_tokenstream(
     input: syn::parse::ParseStream,
-    mut names: HashMap<String, Value>,
+    namespace: &Namespace,
 ) -> syn::Result<TokenStream> {
+    let mut namespace = namespace.fork();
     let mut output = TokenStream::new();
 
     while let Some(token) = input.parse::<Option<TokenTree>>()? {
@@ -21,9 +20,10 @@ pub fn map_tokenstream(
         if is_after_marker {
             let frag = Fragment::parse(input)?;
 
-            frag.apply(&mut names, &mut output)?;
+            namespace.flush();
+            frag.apply(&mut namespace, &mut output)?;
         } else if let TokenTree::Group(group) = &token {
-            let map_fn = |input: ParseStream| map_tokenstream(input, names.clone());
+            let map_fn = |input: ParseStream| map_tokenstream(input, &namespace);
             let group_stream = map_fn.parse2(group.stream())?;
 
             output.append(Group::new(group.delimiter(), group_stream));

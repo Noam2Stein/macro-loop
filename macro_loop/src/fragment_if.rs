@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
 use quote::TokenStreamExt;
@@ -9,7 +7,7 @@ use syn::{
     token::Brace,
 };
 
-use super::{expr::*, fragment::*, map::*, value::*};
+use super::{expr::*, fragment::*, map::*, namespace::*, value::*};
 
 #[derive(Clone, Parse)]
 pub struct FragmentIf {
@@ -22,12 +20,8 @@ pub struct FragmentIf {
 }
 
 impl ApplyFragment for FragmentIf {
-    fn apply(
-        self,
-        names: &mut HashMap<String, Value>,
-        tokens: &mut TokenStream,
-    ) -> syn::Result<()> {
-        let condition = Value::from_expr(self.condition.clone(), names.clone())?;
+    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+        let condition = Value::from_expr(self.condition.clone(), &namespace)?;
 
         let condition = match condition {
             Value::Bool(condition) => condition.value,
@@ -35,7 +29,7 @@ impl ApplyFragment for FragmentIf {
         };
 
         if condition {
-            let map_fn = |input: ParseStream| map_tokenstream(input, names.clone());
+            let map_fn = |input: ParseStream| map_tokenstream(input, &namespace);
             tokens.append_all(map_fn.parse2(self.body.clone())?);
         }
 

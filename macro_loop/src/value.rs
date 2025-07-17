@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::CStr};
+use std::ffi::CStr;
 
 use proc_macro2::{Group, Span, TokenStream, TokenTree};
 use quote::{ToTokens, TokenStreamExt};
@@ -12,7 +12,7 @@ use syn::{
 
 use crate::map::map_tokenstream;
 
-use super::{expr::*, ops::*, to_tokens_spanned::*};
+use super::{expr::*, namespace::*, ops::*, to_tokens_spanned::*};
 
 #[derive(Clone)]
 pub enum Value {
@@ -103,8 +103,8 @@ impl ToTokens for ValueList {
 }
 
 impl Value {
-    pub fn from_expr(expr: Expr, names: HashMap<String, Value>) -> syn::Result<Self> {
-        let map_fn = |input: ParseStream| map_tokenstream(input, names.clone());
+    pub fn from_expr(expr: Expr, namespace: &Namespace) -> syn::Result<Self> {
+        let map_fn = |input: ParseStream| map_tokenstream(input, namespace);
         let expr = parse2::<Expr>(map_fn.parse2(expr.to_token_stream())?)?;
 
         Ok(match expr {
@@ -122,15 +122,15 @@ impl Value {
                 items: list
                     .items
                     .into_iter()
-                    .map(|item| Self::from_expr(item, names.clone()))
+                    .map(|item| Self::from_expr(item, namespace))
                     .collect::<syn::Result<_>>()?,
             }),
 
             Expr::Name(_) => unreachable!(),
 
             Expr::Bin(ExprBin { lhs, op, rhs }) => {
-                let lhs = Value::from_expr(*lhs, names.clone())?;
-                let rhs = Value::from_expr(*rhs, names.clone())?;
+                let lhs = Value::from_expr(*lhs, namespace)?;
+                let rhs = Value::from_expr(*rhs, namespace)?;
 
                 match (lhs, rhs) {
                     (Self::Bool(lhs), Self::Bool(rhs)) => {
@@ -174,7 +174,7 @@ impl Value {
             }
 
             Expr::Un(ExprUn { op, base }) => {
-                let base = Value::from_expr(*base, names)?;
+                let base = Value::from_expr(*base, namespace)?;
 
                 match base {
                     _ => return Err(Error::new_spanned(op, "invalid operation")),
@@ -182,11 +182,11 @@ impl Value {
             }
 
             Expr::Method(expr) => {
-                let base = Value::from_expr(*expr.base, names.clone())?;
+                let base = Value::from_expr(*expr.base, namespace)?;
                 let inputs = expr
                     .inputs
                     .into_iter()
-                    .map(|input| Value::from_expr(input, names.clone()))
+                    .map(|input| Value::from_expr(input, namespace))
                     .collect::<syn::Result<_>>()?;
 
                 match expr.method.to_string().as_str() {

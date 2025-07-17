@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
 use syn::{
@@ -9,7 +7,7 @@ use syn::{
 
 use super::{
     fragment_concat::*, fragment_expr::*, fragment_for::*, fragment_if::*, fragment_let::*,
-    fragment_name::*, value::*,
+    fragment_name::*, namespace::*,
 };
 
 #[derive(Clone, Parse)]
@@ -39,23 +37,18 @@ pub enum Fragment {
 }
 
 pub trait ApplyFragment {
-    fn apply(self, names: &mut HashMap<String, Value>, tokens: &mut TokenStream)
-    -> syn::Result<()>;
+    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()>;
 }
 
 impl ApplyFragment for Fragment {
-    fn apply(
-        self,
-        names: &mut HashMap<String, Value>,
-        tokens: &mut TokenStream,
-    ) -> syn::Result<()> {
+    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
         match self {
-            Self::For(self_) => self_.apply(names, tokens),
-            Self::If(self_) => self_.apply(names, tokens),
-            Self::Let(self_) => self_.apply(names, tokens),
-            Self::Expr(self_) => self_.apply(names, tokens),
-            Self::Ident(self_) => self_.apply(names, tokens),
-            Self::Name(self_) => self_.apply(names, tokens),
+            Self::For(self_) => self_.apply(namespace, tokens),
+            Self::If(self_) => self_.apply(namespace, tokens),
+            Self::Let(self_) => self_.apply(namespace, tokens),
+            Self::Expr(self_) => self_.apply(namespace, tokens),
+            Self::Ident(self_) => self_.apply(namespace, tokens),
+            Self::Name(self_) => self_.apply(namespace, tokens),
         }
     }
 }

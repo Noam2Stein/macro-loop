@@ -1,11 +1,9 @@
-use std::collections::HashMap;
-
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::token::Paren;
 
-use super::{expr::*, fragment::*, value::*};
+use super::{expr::*, fragment::*, namespace::*, value::*};
 
 #[derive(Clone, Parse)]
 pub struct FragmentExpr {
@@ -16,12 +14,8 @@ pub struct FragmentExpr {
 }
 
 impl ApplyFragment for FragmentExpr {
-    fn apply(
-        self,
-        names: &mut HashMap<String, Value>,
-        tokens: &mut TokenStream,
-    ) -> syn::Result<()> {
-        let value = Value::from_expr(self.expr, names.clone())?;
+    fn apply(self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+        let value = Value::from_expr(self.expr, &namespace)?;
 
         value.to_tokens(tokens);
 
