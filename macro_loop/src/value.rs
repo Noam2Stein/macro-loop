@@ -238,12 +238,11 @@ impl Value {
         })
     }
 
-    fn min_method(base: Value, span: Span, mut inputs: Vec<Value>) -> syn::Result<Self> {
-        if inputs.len() != 1 {
-            return Err(Error::new(span, "expected one argument"));
-        }
-
-        let other = inputs.remove(0);
+    fn min_method(base: Value, span: Span, inputs: Vec<Value>) -> syn::Result<Self> {
+        let [other] = match <[_; 1]>::try_from(inputs) {
+            Ok(inputs) => inputs,
+            _ => return Err(Error::new(span, "expected 1 argument")),
+        };
 
         let other_is_greater = Self::from_expr(
             &Expr::Bin(ExprBin {
@@ -262,12 +261,11 @@ impl Value {
         Ok(if other_is_greater { base } else { other })
     }
 
-    fn max_method(base: Value, span: Span, mut inputs: Vec<Value>) -> syn::Result<Self> {
-        if inputs.len() != 1 {
-            return Err(Error::new(span, "expected one argument"));
-        }
-
-        let other = inputs.remove(0);
+    fn max_method(base: Value, span: Span, inputs: Vec<Value>) -> syn::Result<Self> {
+        let [other] = match inputs.try_into() {
+            Ok(inputs) => inputs,
+            _ => return Err(Error::new(span, "expected 1 argument")),
+        };
 
         let other_is_greater = Self::from_expr(
             &Expr::Bin(ExprBin {
@@ -286,13 +284,11 @@ impl Value {
         Ok(if other_is_greater { other } else { base })
     }
 
-    fn clamp_method(base: Value, span: Span, mut inputs: Vec<Value>) -> syn::Result<Self> {
-        if inputs.len() != 2 {
-            return Err(Error::new(span, "expected 2 arguments"));
-        }
-
-        let max = inputs.remove(1);
-        let min = inputs.remove(0);
+    fn clamp_method(base: Value, span: Span, inputs: Vec<Value>) -> syn::Result<Self> {
+        let [min, max] = match inputs.try_into() {
+            Ok(inputs) => inputs,
+            _ => return Err(Error::new(span, "expected 2 arguments")),
+        };
 
         let min_is_greater = Self::from_expr(
             &Expr::Bin(ExprBin {
@@ -332,9 +328,10 @@ impl Value {
     }
 
     fn enumerate_method(base: Value, span: Span, inputs: Vec<Value>) -> syn::Result<Self> {
-        if inputs.len() != 0 {
-            return Err(Error::new(span, "expected zero arguments"));
-        }
+        let [] = match inputs.try_into() {
+            Ok(inputs) => inputs,
+            _ => return Err(Error::new(span, "expected 0 arguments")),
+        };
 
         Ok(match base {
             Self::List(base) => Self::List(ValueList {
@@ -360,11 +357,12 @@ impl Value {
     }
 
     fn index_method(base: Value, span: Span, inputs: Vec<Value>) -> syn::Result<Self> {
-        if inputs.len() != 1 {
-            return Err(Error::new(span, "expected one argument"));
-        }
+        let [idx] = match inputs.try_into() {
+            Ok(inputs) => inputs,
+            _ => return Err(Error::new(span, "expected 1 argument")),
+        };
 
-        let idx = match &inputs[0] {
+        let idx = match &idx {
             Value::Int(int) => int.base10_parse::<usize>().unwrap(),
 
             Value::List(list) => {
@@ -386,7 +384,7 @@ impl Value {
             Self::List(base) => match base.items.get(idx) {
                 Some(item) => item.clone(),
 
-                None => return Err(Error::new_spanned(&inputs[0], "out of bounds")),
+                None => return Err(Error::new_spanned(&idx, "out of bounds")),
             },
 
             _ => return Err(Error::new_spanned(base, "expected a list")),
