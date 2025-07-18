@@ -16,8 +16,8 @@ use super::{fragment::*, ops::*, value::*};
 pub enum Expr {
     Value(Value),
     Frag(ExprFrag),
-    Bin(ExprBin),
-    Un(ExprUn),
+    Bin(Box<ExprBin>),
+    Un(Box<ExprUn>),
     Method(ExprMethod),
     List(ExprList),
     Paren(Box<Expr>),
@@ -29,14 +29,14 @@ pub struct ExprList {
 }
 
 pub struct ExprBin {
-    pub lhs: Box<Expr>,
+    pub lhs: Expr,
     pub op: BinOp,
-    pub rhs: Box<Expr>,
+    pub rhs: Expr,
 }
 
 pub struct ExprUn {
     pub op: UnOp,
-    pub base: Box<Expr>,
+    pub base: Expr,
 }
 
 #[derive(Parse)]
@@ -58,36 +58,37 @@ impl Parse for Expr {
         while let Some(op) = BinOp::option_parse(input) {
             let rhs = Expr::parse_single(input)?;
 
-            if let Expr::Bin(ExprBin {
-                lhs: _,
-                op: output_op,
-                rhs: ref mut output_rhs,
-            }) = output
-            {
+            if let Expr::Bin(ref mut bin) = output {
+                let ExprBin {
+                    lhs: _,
+                    op: output_op,
+                    rhs: ref mut output_rhs,
+                } = **bin;
+
                 if output_op.lvl() > op.lvl() {
                     output_rhs.replace(|output_rhs| {
-                        Expr::Bin(ExprBin {
-                            lhs: Box::new(output_rhs),
+                        Expr::Bin(Box::new(ExprBin {
+                            lhs: output_rhs,
                             op,
-                            rhs: Box::new(rhs),
-                        })
+                            rhs,
+                        }))
                     });
                 } else {
                     output.replace(|output| {
-                        Expr::Bin(ExprBin {
-                            lhs: Box::new(output),
+                        Expr::Bin(Box::new(ExprBin {
+                            lhs: output,
                             op,
-                            rhs: Box::new(rhs),
-                        })
+                            rhs,
+                        }))
                     });
                 }
             } else {
                 output.replace(|output| {
-                    Expr::Bin(ExprBin {
-                        lhs: Box::new(output),
+                    Expr::Bin(Box::new(ExprBin {
+                        lhs: output,
                         op,
-                        rhs: Box::new(rhs),
-                    })
+                        rhs,
+                    }))
                 });
             }
         }
@@ -149,9 +150,9 @@ impl Expr {
 
     fn parse_base(input: syn::parse::ParseStream) -> syn::Result<Self> {
         if let Some(op) = UnOp::option_parse(input) {
-            let base = Box::new(Expr::parse_single(input)?);
+            let base = Expr::parse_single(input)?;
 
-            return Ok(Self::Un(ExprUn { op, base }));
+            return Ok(Self::Un(Box::new(ExprUn { op, base })));
         };
 
         if let Some(lit) = input.parse::<Option<Lit>>()? {

@@ -115,7 +115,9 @@ impl Value {
                     .collect::<syn::Result<_>>()?,
             }),
 
-            Expr::Bin(ExprBin { lhs, op, rhs }) => {
+            Expr::Bin(bin) => {
+                let ExprBin { lhs, op, rhs } = &**bin;
+
                 let lhs = Value::from_expr(lhs, namespace)?;
                 let rhs = Value::from_expr(rhs, namespace)?;
 
@@ -160,7 +162,9 @@ impl Value {
                 }
             }
 
-            Expr::Un(ExprUn { op, base }) => {
+            Expr::Un(un) => {
+                let ExprUn { op, base } = &**un;
+
                 let base = Value::from_expr(base, namespace)?;
 
                 match base {
@@ -245,11 +249,11 @@ impl Value {
         };
 
         let other_is_greater = Self::from_expr(
-            &Expr::Bin(ExprBin {
-                lhs: Box::new(Expr::Value(base.clone())),
+            &Expr::Bin(Box::new(ExprBin {
+                lhs: Expr::Value(base.clone()),
                 op: BinOp::Gt(Token![>](span)),
-                rhs: Box::new(Expr::Value(other.clone())),
-            }),
+                rhs: Expr::Value(other.clone()),
+            })),
             &Namespace::new(),
         )?;
 
@@ -268,11 +272,11 @@ impl Value {
         };
 
         let other_is_greater = Self::from_expr(
-            &Expr::Bin(ExprBin {
-                lhs: Box::new(Expr::Value(base.clone())),
+            &Expr::Bin(Box::new(ExprBin {
+                lhs: Expr::Value(base.clone()),
                 op: BinOp::Gt(Token![>](span)),
-                rhs: Box::new(Expr::Value(other.clone())),
-            }),
+                rhs: Expr::Value(other.clone()),
+            })),
             &Namespace::new(),
         )?;
 
@@ -291,20 +295,20 @@ impl Value {
         };
 
         let min_is_greater = Self::from_expr(
-            &Expr::Bin(ExprBin {
-                lhs: Box::new(Expr::Value(base.clone())),
+            &Expr::Bin(Box::new(ExprBin {
+                lhs: Expr::Value(base.clone()),
                 op: BinOp::Gt(Token![>](span)),
-                rhs: Box::new(Expr::Value(min.clone())),
-            }),
+                rhs: Expr::Value(min.clone()),
+            })),
             &Namespace::new(),
         )?;
 
         let max_is_greater = Self::from_expr(
-            &Expr::Bin(ExprBin {
-                lhs: Box::new(Expr::Value(base.clone())),
+            &Expr::Bin(Box::new(ExprBin {
+                lhs: Expr::Value(base.clone()),
                 op: BinOp::Gt(Token![>](span)),
-                rhs: Box::new(Expr::Value(max.clone())),
-            }),
+                rhs: Expr::Value(max.clone()),
+            })),
             &Namespace::new(),
         )?;
 
