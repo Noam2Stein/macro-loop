@@ -179,6 +179,9 @@ impl Value {
                 match expr.method.to_string().as_str() {
                     "enumerate" => Self::enumerate_method(base, expr.method.span(), inputs)?,
                     "index" => Self::index_method(base, expr.method.span(), inputs)?,
+                    "min" => Self::min_method(base, expr.method.span(), inputs)?,
+                    "max" => Self::max_method(base, expr.method.span(), inputs)?,
+                    "clamp" => Self::clamp_method(base, expr.method.span(), inputs)?,
 
                     _ => return Err(Error::new_spanned(&expr.method, "Unknown method")),
                 }
@@ -232,6 +235,99 @@ impl Value {
             _ => {
                 return Err(Error::new_spanned(self, "not an identifier value"));
             }
+        })
+    }
+
+    fn min_method(base: Value, span: Span, mut inputs: Vec<Value>) -> syn::Result<Self> {
+        if inputs.len() != 1 {
+            return Err(Error::new(span, "expected one argument"));
+        }
+
+        let other = inputs.remove(0);
+
+        let other_is_greater = Self::from_expr(
+            &Expr::Bin(ExprBin {
+                lhs: Box::new(Expr::Value(base.clone())),
+                op: BinOp::Gt(Token![>](span)),
+                rhs: Box::new(Expr::Value(other.clone())),
+            }),
+            &Namespace::new(),
+        )?;
+
+        let other_is_greater = match other_is_greater {
+            Self::Bool(b) => b.value,
+            _ => unreachable!(),
+        };
+
+        Ok(if other_is_greater { base } else { other })
+    }
+
+    fn max_method(base: Value, span: Span, mut inputs: Vec<Value>) -> syn::Result<Self> {
+        if inputs.len() != 1 {
+            return Err(Error::new(span, "expected one argument"));
+        }
+
+        let other = inputs.remove(0);
+
+        let other_is_greater = Self::from_expr(
+            &Expr::Bin(ExprBin {
+                lhs: Box::new(Expr::Value(base.clone())),
+                op: BinOp::Gt(Token![>](span)),
+                rhs: Box::new(Expr::Value(other.clone())),
+            }),
+            &Namespace::new(),
+        )?;
+
+        let other_is_greater = match other_is_greater {
+            Self::Bool(b) => b.value,
+            _ => unreachable!(),
+        };
+
+        Ok(if other_is_greater { other } else { base })
+    }
+
+    fn clamp_method(base: Value, span: Span, mut inputs: Vec<Value>) -> syn::Result<Self> {
+        if inputs.len() != 2 {
+            return Err(Error::new(span, "expected 2 arguments"));
+        }
+
+        let max = inputs.remove(1);
+        let min = inputs.remove(0);
+
+        let min_is_greater = Self::from_expr(
+            &Expr::Bin(ExprBin {
+                lhs: Box::new(Expr::Value(base.clone())),
+                op: BinOp::Gt(Token![>](span)),
+                rhs: Box::new(Expr::Value(min.clone())),
+            }),
+            &Namespace::new(),
+        )?;
+
+        let max_is_greater = Self::from_expr(
+            &Expr::Bin(ExprBin {
+                lhs: Box::new(Expr::Value(base.clone())),
+                op: BinOp::Gt(Token![>](span)),
+                rhs: Box::new(Expr::Value(max.clone())),
+            }),
+            &Namespace::new(),
+        )?;
+
+        let min_is_greater = match min_is_greater {
+            Self::Bool(b) => b.value,
+            _ => unreachable!(),
+        };
+
+        let max_is_greater = match max_is_greater {
+            Self::Bool(b) => b.value,
+            _ => unreachable!(),
+        };
+
+        Ok(if min_is_greater {
+            min
+        } else if max_is_greater {
+            base
+        } else {
+            max
         })
     }
 
