@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use macro_loop::macro_loop;
 
 fn main() {

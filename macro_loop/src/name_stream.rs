@@ -5,6 +5,7 @@ use quote::{ToTokens, TokenStreamExt};
 use syn::{
     Token,
     parse::{Parse, ParseStream, Parser},
+    token::{Brace, Bracket, Paren},
 };
 
 use super::{fragment::*, namespace::*};
@@ -32,8 +33,9 @@ impl Parse for NameStream {
         let mut tokenstream = TokenStream::new();
 
         while !input.is_empty() {
-            let parsed_at_token = input.parse::<Option<Token![@]>>()?;
-            if parsed_at_token.is_some() {
+            if input.peek(Token![@]) {
+                let _ = input.parse::<Token![@]>().unwrap();
+
                 output
                     .segs
                     .push(NameStreamSegment::TokenStream(take(&mut tokenstream)));
@@ -41,27 +43,26 @@ impl Parse for NameStream {
                 let fragment = input.parse::<Frag>()?;
 
                 output.segs.push(NameStreamSegment::Fragment(fragment));
+            } else if input.peek(Brace) || input.peek(Paren) || input.peek(Bracket) {
+                let group = input.parse::<Group>().unwrap();
 
-                continue;
-            }
-
-            let parsed_group = input.parse::<Option<Group>>()?;
-            if let Some(parsed_group) = parsed_group {
                 output
                     .segs
                     .push(NameStreamSegment::TokenStream(take(&mut tokenstream)));
 
                 output.segs.push(NameStreamSegment::Group(NameStreamGroup {
-                    span: parsed_group.span(),
-                    delim: parsed_group.delimiter(),
-                    stream: Box::new(NameStream::parse.parse2(parsed_group.stream())?),
+                    span: group.span(),
+                    delim: group.delimiter(),
+                    stream: Box::new(NameStream::parse.parse2(group.stream())?),
                 }));
-
-                continue;
+            } else {
+                tokenstream.append(input.parse::<TokenTree>()?);
             }
-
-            tokenstream.append(input.parse::<TokenTree>()?);
         }
+
+        output
+            .segs
+            .push(NameStreamSegment::TokenStream(take(&mut tokenstream)));
 
         Ok(output)
     }
