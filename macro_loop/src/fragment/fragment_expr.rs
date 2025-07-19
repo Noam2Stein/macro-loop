@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::token::Paren;
 
-use super::{expr::*, fragment::*, namespace::*, value::*};
+use super::*;
 
 #[derive(Parse)]
 pub struct FragExpr {
@@ -14,7 +14,11 @@ pub struct FragExpr {
 }
 
 impl ApplyFragment for FragExpr {
-    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+    fn apply<'s: 'v, 'v>(
+        &'s self,
+        namespace: &mut Namespace<'v, 'v>,
+        tokens: &mut TokenStream,
+    ) -> syn::Result<()> {
         let value = Value::from_expr(&self.expr, &namespace)?;
 
         value.to_tokens(tokens);

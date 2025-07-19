@@ -1,18 +1,19 @@
 use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
-use syn::Ident;
 
-use crate::to_tokens_spanned::ToTokensSpanned;
-
-use super::{fragment::*, namespace::*};
+use super::*;
 
 #[derive(Clone, Parse)]
 pub struct FragName {
-    name: Ident,
+    name: Name,
 }
 
 impl ApplyFragment for FragName {
-    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+    fn apply<'s: 'v, 'v>(
+        &'s self,
+        namespace: &mut Namespace<'v, 'v>,
+        tokens: &mut TokenStream,
+    ) -> syn::Result<()> {
         let value = namespace.get(&self.name)?;
 
         value.to_tokens_spanned(self.name.span(), tokens);

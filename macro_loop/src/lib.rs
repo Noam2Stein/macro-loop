@@ -1,23 +1,13 @@
 #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 
-use proc_macro2::TokenStream;
-use syn::parse::{Parse, ParseStream, Parser};
-
 mod expr;
 mod fragment;
-mod fragment_concat;
-mod fragment_expr;
-mod fragment_for;
-mod fragment_if;
-mod fragment_let;
-mod fragment_name;
-mod name_stream;
-mod namespace;
-mod ops;
-mod pattern;
-mod to_tokens_spanned;
+mod name;
 mod value;
+
+mod util;
+use util::*;
 
 /// `macro_loop!` provides special fragment features using `@`.
 ///
@@ -110,6 +100,8 @@ mod value;
 /// ```
 #[proc_macro]
 pub fn macro_loop(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    use syn::parse::Parser;
+
     match macro_loop_.parse2(input.into()) {
         Ok(stream) => stream,
         Err(err) => err.into_compile_error(),
@@ -117,8 +109,10 @@ pub fn macro_loop(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     .into()
 }
 
-fn macro_loop_(input: ParseStream) -> syn::Result<TokenStream> {
-    let name_stream = name_stream::NameStream::parse(input)?;
+fn macro_loop_(input: syn::parse::ParseStream) -> syn::Result<proc_macro2::TokenStream> {
+    use syn::parse::Parse;
 
-    name_stream.resolve(&namespace::Namespace::new())
+    let name_stream = name::NameStream::parse(input)?;
+
+    name_stream.resolve(&name::Namespace::new())
 }

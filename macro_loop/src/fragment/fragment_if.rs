@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::TokenStreamExt;
 use syn::{Error, Token, token::Brace};
 
-use super::{expr::*, fragment::*, name_stream::*, namespace::*, value::*};
+use super::*;
 
 #[derive(Parse)]
 pub struct FragIf {
@@ -16,10 +16,14 @@ pub struct FragIf {
 }
 
 impl ApplyFragment for FragIf {
-    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+    fn apply<'s: 'v, 'v>(
+        &'s self,
+        namespace: &mut Namespace<'v, 'v>,
+        tokens: &mut TokenStream,
+    ) -> syn::Result<()> {
         let condition = Value::from_expr(&self.condition, &namespace)?;
 
-        let condition = match condition {
+        let condition = match &*condition {
             Value::Bool(condition) => condition.value,
             _ => return Err(Error::new_spanned(&self._if_token, "expected a bool")),
         };

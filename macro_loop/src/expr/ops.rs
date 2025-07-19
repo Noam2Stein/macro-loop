@@ -1,5 +1,7 @@
 use derive_quote_to_tokens::ToTokens;
-use syn::{RangeLimits, Token, parse::Parse, spanned::Spanned};
+use syn::{RangeLimits, Token, parse::Parse};
+
+use super::*;
 
 #[derive(Clone, Copy, ToTokens)]
 pub enum BinOp {
@@ -119,7 +121,7 @@ impl UnOp {
 
             ($punct:tt => $variant:ident($variant_punct:tt)) => {
                 if let Some(inner) = input.parse::<Option<Token![$punct]>>().unwrap() {
-                    return Some(Self::$variant(Token![$variant_punct](inner.span())));
+                    return Some(Self::$variant(Token![$variant_punct](syn::spanned::Spanned::span(&inner),)));
                 }
             };
         }
@@ -129,5 +131,35 @@ impl UnOp {
         option_parse!(! => Not);
 
         None
+    }
+}
+
+impl Spanned for BinOp {
+    fn span(&self) -> proc_macro2::Span {
+        match self {
+            Self::Add(self_) => self_.span,
+            Self::Sub(self_) => self_.span,
+            Self::Mul(self_) => self_.span,
+            Self::Div(self_) => self_.span,
+            Self::Rem(self_) => self_.span,
+
+            Self::BitAnd(self_) => self_.span,
+            Self::BitOr(self_) => self_.span,
+            Self::BitXor(self_) => self_.span,
+            Self::Shl(self_) => syn::spanned::Spanned::span(self_),
+            Self::Shr(self_) => syn::spanned::Spanned::span(self_),
+
+            Self::Eq(self_) => syn::spanned::Spanned::span(self_),
+            Self::Ne(self_) => syn::spanned::Spanned::span(self_),
+            Self::Gt(self_) => syn::spanned::Spanned::span(self_),
+            Self::Lt(self_) => syn::spanned::Spanned::span(self_),
+            Self::Ge(self_) => syn::spanned::Spanned::span(self_),
+            Self::Le(self_) => syn::spanned::Spanned::span(self_),
+            Self::LogicalAnd(self_) => syn::spanned::Spanned::span(self_),
+            Self::LogicalOr(self_) => syn::spanned::Spanned::span(self_),
+
+            Self::Range(self_) => syn::spanned::Spanned::span(self_),
+            Self::RangeInclusive(self_) => syn::spanned::Spanned::span(self_),
+        }
     }
 }

@@ -2,7 +2,7 @@ use derive_syn_parse::Parse;
 use proc_macro2::TokenStream;
 use syn::Token;
 
-use super::{expr::*, fragment::*, namespace::*, pattern::*, value::*};
+use super::*;
 
 #[derive(Parse)]
 pub struct FragLet {
@@ -14,10 +14,14 @@ pub struct FragLet {
 }
 
 impl ApplyFragment for FragLet {
-    fn apply(&self, namespace: &mut Namespace, _tokens: &mut TokenStream) -> syn::Result<()> {
+    fn apply<'s: 'v, 'v>(
+        &'s self,
+        namespace: &mut Namespace<'v, 'v>,
+        _tokens: &mut TokenStream,
+    ) -> syn::Result<()> {
         let value = Value::from_expr(&self.value, &namespace)?;
 
-        self.pat.insert_to_namespace(value, namespace)?;
+        namespace.insert_pat(&self.pat, value)?;
 
         Ok(())
     }

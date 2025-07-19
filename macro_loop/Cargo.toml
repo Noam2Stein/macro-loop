@@ -14,6 +14,7 @@ proc-macro = true
 [dependencies]
 derive-quote-to-tokens = "0.1.1"
 derive-syn-parse       = "0.2.0"
+derive_more            = { version = "2.0.1", features = [ "display" ] }
 proc-macro2            = "1.0.95"
 quote                  = "1.0.40"
 syn                    = { version = "2.0.104", features = [ "full" ] }

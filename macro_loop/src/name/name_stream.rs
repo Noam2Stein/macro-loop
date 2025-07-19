@@ -8,7 +8,7 @@ use syn::{
     token::{Brace, Bracket, Paren},
 };
 
-use super::{fragment::*, namespace::*};
+use super::*;
 
 pub struct NameStream {
     segs: Vec<NameStreamSegment>,

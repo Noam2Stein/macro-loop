@@ -11,10 +11,10 @@ use syn::{
     token::Bracket,
 };
 
-use super::{fragment::*, ops::*, value::*};
+use super::*;
 
 pub enum Expr {
-    Value(Value),
+    Value(Value<'static>),
     Frag(ExprFrag),
     Bin(Box<ExprBin>),
     Un(Box<ExprUn>),
@@ -47,7 +47,7 @@ pub struct ExprFrag {
 
 pub struct ExprMethod {
     pub base: Box<Expr>,
-    pub method: Ident,
+    pub method: IdentStr,
     pub inputs: Vec<Expr>,
 }
 
@@ -66,30 +66,12 @@ impl Parse for Expr {
                 } = **bin;
 
                 if output_op.lvl() > op.lvl() {
-                    output_rhs.replace(|output_rhs| {
-                        Expr::Bin(Box::new(ExprBin {
-                            lhs: output_rhs,
-                            op,
-                            rhs,
-                        }))
-                    });
+                    output_rhs.try_replace(|output_rhs| Self::bin(output_rhs, op, rhs))?;
                 } else {
-                    output.replace(|output| {
-                        Expr::Bin(Box::new(ExprBin {
-                            lhs: output,
-                            op,
-                            rhs,
-                        }))
-                    });
+                    output.try_replace(|output| Self::bin(output, op, rhs))?;
                 }
             } else {
-                output.replace(|output| {
-                    Expr::Bin(Box::new(ExprBin {
-                        lhs: output,
-                        op,
-                        rhs,
-                    }))
-                });
+                output.try_replace(|output| Self::bin(output, op, rhs))?;
             }
         }
 
@@ -105,7 +87,7 @@ impl Expr {
             if input.peek(Token![.]) && !input.peek(Token![..]) {
                 input.parse::<Token![.]>().unwrap();
 
-                let method = input.parse::<Ident>()?;
+                let method = input.parse::<IdentStr>()?;
 
                 let inputs = input.parse::<Group>()?;
                 if inputs.delimiter() != Delimiter::Parenthesis {
@@ -136,7 +118,7 @@ impl Expr {
                 output.replace(|output| {
                     Self::Method(ExprMethod {
                         base: Box::new(output),
-                        method: Ident::new("index", group.span()),
+                        method: IdentStr::new("index", group.span()),
                         inputs: vec![idx],
                     })
                 });
@@ -152,15 +134,15 @@ impl Expr {
         if let Some(op) = UnOp::option_parse(input) {
             let base = Expr::parse_single(input)?;
 
-            return Ok(Self::Un(Box::new(ExprUn { op, base })));
+            return Self::un(op, base);
         };
 
         if let Some(lit) = input.parse::<Option<Lit>>()? {
             return Ok(Self::Value(Value::from_lit(lit)?));
         };
 
-        if let Some(ident) = input.parse::<Option<Ident>>()? {
-            return Ok(Self::Value(Value::Ident(ident)));
+        if input.peek(Ident) {
+            return Ok(Self::Value(Value::Ident(input.parse().unwrap())));
         };
 
         if let Some(group) = input.parse::<Option<Group>>()? {
@@ -202,11 +184,35 @@ impl Expr {
         Err(input.error("expected an expression"))
     }
 
-    fn temporary() -> Self {
-        Self::Value(Value::Bool(LitBool::new(false, Span::call_site())))
+    fn bin(self, op: BinOp, rhs: Self) -> syn::Result<Self> {
+        Ok(
+            if let (Self::Value(self_), Self::Value(rhs)) = (&self, &rhs) {
+                Self::Value(self_.bin_op(op, rhs)?)
+            } else {
+                Self::Bin(Box::new(ExprBin { lhs: self, op, rhs }))
+            },
+        )
+    }
+
+    fn un(op: UnOp, base: Self) -> syn::Result<Self> {
+        Ok(if let Self::Value(base) = base {
+            Self::Value(base.un_op(op)?)
+        } else {
+            Self::Un(Box::new(ExprUn { op, base }))
+        })
     }
 
     fn replace(&mut self, value: impl FnOnce(Self) -> Self) {
         *self = value(replace(self, Self::temporary()));
+    }
+
+    fn try_replace(&mut self, value: impl FnOnce(Self) -> syn::Result<Self>) -> syn::Result<()> {
+        *self = value(replace(self, Self::temporary()))?;
+
+        Ok(())
+    }
+
+    fn temporary() -> Self {
+        Self::Value(Value::Bool(LitBool::new(false, Span::call_site())))
     }
 }

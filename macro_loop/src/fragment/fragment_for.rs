@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::TokenStreamExt;
 use syn::{Error, Token, punctuated::Punctuated, token::Brace};
 
-use super::{expr::*, fragment::*, name_stream::*, namespace::*, pattern::*, value::*};
+use super::*;
 
 #[derive(Parse)]
 pub struct FragFor {
@@ -24,7 +24,11 @@ struct FragForSegment {
 }
 
 impl ApplyFragment for FragFor {
-    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+    fn apply<'s: 'v, 'v>(
+        &'s self,
+        namespace: &mut Namespace<'v, 'v>,
+        tokens: &mut TokenStream,
+    ) -> syn::Result<()> {
         self.apply_inner(namespace, tokens, 0)
     }
 }
@@ -46,16 +50,15 @@ impl FragFor {
 
         let values = Value::from_expr(&segment.items, &namespace)?;
 
-        let values = if let Value::List(values) = values {
-            values.items
+        let values = if let Value::List(values) = &*values {
+            &values.items
         } else {
             return Err(Error::new_spanned(&values, "expected a list"));
         };
 
         for value in values {
             let mut namespace = namespace.fork();
-
-            segment.pat.insert_to_namespace(value, &mut namespace)?;
+            namespace.insert_pat(&segment.pat, ValueRef::Ref(value))?;
 
             self.apply_inner(&mut namespace, tokens, seg_idx + 1)?;
         }

@@ -6,10 +6,7 @@ use syn::{
     token::{Bracket, Paren},
 };
 
-use super::{
-    fragment_concat::*, fragment_expr::*, fragment_for::*, fragment_if::*, fragment_let::*,
-    fragment_name::*, namespace::*,
-};
+use super::*;
 
 #[derive(Parse)]
 pub enum Frag {
@@ -41,11 +38,19 @@ pub enum Frag {
 }
 
 pub trait ApplyFragment {
-    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()>;
+    fn apply<'s: 'v, 'v>(
+        &'s self,
+        namespace: &mut Namespace<'v, 'v>,
+        tokens: &mut TokenStream,
+    ) -> syn::Result<()>;
 }
 
 impl ApplyFragment for Frag {
-    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+    fn apply<'s: 'v, 'v>(
+        &'s self,
+        namespace: &mut Namespace<'v, 'v>,
+        tokens: &mut TokenStream,
+    ) -> syn::Result<()> {
         match self {
             Self::For(self_) => self_.apply(namespace, tokens),
             Self::If(self_) => self_.apply(namespace, tokens),

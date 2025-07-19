@@ -8,7 +8,7 @@ use syn::{
     token::Bracket,
 };
 
-use super::{expr::*, fragment::*, namespace::*, value::*};
+use super::*;
 
 #[derive(Parse)]
 pub struct FragConcat {
@@ -21,7 +21,7 @@ pub struct FragConcat {
     _type_arrow: Option<Token![=>]>,
     #[inside(_brackets)]
     #[parse_if(_type_arrow.is_some())]
-    type_: Option<Ident>,
+    type_: Option<IdentStr>,
 }
 
 #[derive(Parse)]
@@ -40,7 +40,11 @@ struct SegmentFragment {
 }
 
 impl ApplyFragment for FragConcat {
-    fn apply(&self, namespace: &mut Namespace, tokens: &mut TokenStream) -> syn::Result<()> {
+    fn apply<'s: 'v, 'v>(
+        &'s self,
+        namespace: &mut Namespace<'v, 'v>,
+        tokens: &mut TokenStream,
+    ) -> syn::Result<()> {
         let str = self
             .segments
             .iter()
@@ -49,15 +53,9 @@ impl ApplyFragment for FragConcat {
 
         let span = self.segments.iter().map(|seg| seg.span()).nth(0).unwrap();
 
-        let value = match self
-            .type_
-            .as_ref()
-            .map(|type_| type_.to_string())
-            .as_ref()
-            .map(|str| str.as_str())
-        {
+        let value = match self.type_.as_ref().map(|type_| type_.str()) {
             Some("str") => Value::Str(LitStr::new(&str, span)),
-            None => Value::Ident(Ident::new(&str, span)),
+            None => Value::Ident(IdentStr::new(str.into_boxed_str(), span)),
 
             _ => return Err(Error::new_spanned(&self.type_, "invalid concat type")),
         };
