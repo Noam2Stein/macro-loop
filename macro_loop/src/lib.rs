@@ -9,6 +9,9 @@ mod value;
 mod util;
 use util::*;
 
+#[cfg(test)]
+mod speedtests;
+
 /// `macro_loop!` provides special fragment features using `@`.
 ///
 /// # For Loops
@@ -102,14 +105,14 @@ use util::*;
 pub fn macro_loop(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     use syn::parse::Parser;
 
-    match macro_loop_.parse2(input.into()) {
+    match macro_loop2.parse2(input.into()) {
         Ok(stream) => stream,
         Err(err) => err.into_compile_error(),
     }
     .into()
 }
 
-fn macro_loop_(input: syn::parse::ParseStream) -> syn::Result<proc_macro2::TokenStream> {
+fn macro_loop2(input: syn::parse::ParseStream) -> syn::Result<proc_macro2::TokenStream> {
     use syn::parse::Parse;
 
     let name_stream = name::NameStream::parse(input)?;
