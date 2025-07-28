@@ -19,6 +19,10 @@ impl<'a> Value<'a> {
             }
 
             (Self::Str(lhs), Self::Str(rhs)) => Self::str_bin_op(&lhs.value(), op, &rhs.value())?,
+            (Self::Str(lhs), Self::Ident(rhs)) => Self::str_bin_op(&lhs.value(), op, &rhs.str())?,
+            (Self::Str(lhs), Self::Char(rhs)) => {
+                Self::str_bin_op(&lhs.value(), op, &rhs.value().to_string())?
+            }
 
             (Self::Char(lhs), Self::Char(rhs)) => Self::char_bin_op(lhs.value(), op, rhs.value())?,
 
