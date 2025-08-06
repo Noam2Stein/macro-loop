@@ -1,3 +1,10 @@
+# Discontinued
+
+This crate has been renamed to `repetitive`.
+Please use that instead.
+
+See <https://github.com/Noam2Stein/repetitive>.
+
 # macro_loop
 
 `macro_loop` is a macro for writing repetitive Rust code using loops, conditionals, and bindings.

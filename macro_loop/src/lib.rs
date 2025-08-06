@@ -1,5 +1,5 @@
+#![doc = "`macro_loop!` macro crate"]
 #![deny(missing_docs)]
-#![doc = include_str!("../README.md")]
 
 mod expr;
 mod fragment;
